@@ -44,28 +44,34 @@ export function Header({ authed }: { authed: boolean }) {
         </nav>
         <div className="ml-auto hidden items-center gap-5 lg:flex">
           {authed ? (
-            <Link href="/app" className="btn btn-primary">Открыть кабинет</Link>
+            <Link href="/app" className="btn btn-primary px-4 py-2 text-[15px]" title="Перейти в личный кабинет">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>
+              Войти
+            </Link>
           ) : (
             <>
-              <Link href="/login" className="flex items-center gap-2 text-[15px] text-zinc-700 hover:text-brand">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>
+              <Link href="/login" className="btn btn-secondary px-4 py-2 text-[15px]">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>
                 Войти
               </Link>
               <Link href="/register" className="btn btn-primary px-4 py-2 text-[15px]">Создать аккаунт</Link>
             </>
           )}
         </div>
-        <button
-          className="-mr-2 ml-auto flex h-10 w-10 items-center justify-center rounded-md text-zinc-700 hover:bg-zinc-100 lg:hidden"
-          onClick={() => setOpen(!open)}
-          aria-expanded={open}
-          aria-controls="mobile-menu"
-          aria-label={open ? "Закрыть меню" : "Открыть меню"}
-        >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-            {open ? <path d="M5 5l10 10M15 5L5 15" /> : <path d="M3 6h14M3 10h14M3 14h14" />}
-          </svg>
-        </button>
+        <div className="ml-auto flex items-center gap-1 lg:hidden">
+          <Link href={authed ? "/app" : "/login"} className={`btn ${authed ? "btn-primary" : "btn-secondary"} px-3 py-1.5 text-[14px]`} title={authed ? "Перейти в личный кабинет" : undefined}>Войти</Link>
+          <button
+            className="-mr-2 flex h-10 w-10 items-center justify-center rounded-md text-zinc-700 hover:bg-zinc-100"
+            onClick={() => setOpen(!open)}
+            aria-expanded={open}
+            aria-controls="mobile-menu"
+            aria-label={open ? "Закрыть меню" : "Открыть меню"}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+              {open ? <path d="M5 5l10 10M15 5L5 15" /> : <path d="M3 6h14M3 10h14M3 14h14" />}
+            </svg>
+          </button>
+        </div>
       </div>
     </header>
       {open && (
@@ -77,7 +83,7 @@ export function Header({ authed }: { authed: boolean }) {
           </nav>
           <div className="mt-4 grid gap-2">
             {authed ? (
-              <Link href="/app" className="btn btn-primary py-2.5">Открыть кабинет</Link>
+              <Link href="/app" className="btn btn-primary py-2.5">Войти в кабинет</Link>
             ) : (
               <>
                 <Link href="/register" className="btn btn-primary py-2.5">Создать аккаунт</Link>

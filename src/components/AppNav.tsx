@@ -84,6 +84,9 @@ export function AppNav({ name, email, docWarnings, activeCount }: { name: string
         </nav>
       </div>
       <div className="mt-auto px-3 pb-2">
+        <Link href="/" className="flex items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[13px] text-white/65 transition hover:bg-white/[.05] hover:text-white">
+          <Icon name="home" size={15} />На главную
+        </Link>
         <Link
           href="/app/settings"
           className={`flex items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[13px] transition ${path.startsWith("/app/settings") ? "bg-white/[.09] text-white" : "text-white/65 hover:bg-white/[.05] hover:text-white"}`}
