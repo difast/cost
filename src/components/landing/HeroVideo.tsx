@@ -17,6 +17,8 @@ export function HeroVideo() {
   const [reduced, setReduced] = useState(false);
   const [started, setStarted] = useState(false);
   const [muted, setMuted] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  const big = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 639px)");
@@ -27,6 +29,39 @@ export function HeroVideo() {
     mq.addEventListener("change", upd);
     return () => mq.removeEventListener("change", upd);
   }, []);
+
+  // окно с увеличенным видео: продолжает с того же места, со звуком (открыто нажатием — браузер разрешает звук)
+  const open = () => {
+    ref.current?.pause();
+    setExpanded(true);
+  };
+  const close = () => {
+    const t = big.current?.currentTime;
+    setExpanded(false);
+    const v = ref.current;
+    if (v) {
+      if (t !== undefined) v.currentTime = t;
+      if (!reduced) v.play().catch(() => undefined);
+    }
+  };
+  useEffect(() => {
+    if (!expanded) return;
+    const v = big.current;
+    if (v) {
+      v.currentTime = ref.current?.currentTime ?? 0;
+      v.muted = false;
+      v.play().catch(() => { v.muted = true; v.play().catch(() => undefined); });
+    }
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = overflow;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded]);
 
   const mobile = mode === "mobile";
   const autoplay = mode !== null && !reduced;
@@ -72,6 +107,19 @@ export function HeroVideo() {
       {mode && (
         <button
           type="button"
+          onClick={open}
+          className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-[12.5px] font-medium text-white backdrop-blur transition hover:bg-black/75"
+          aria-label="Развернуть видео"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+          </svg>
+          Развернуть
+        </button>
+      )}
+      {mode && (
+        <button
+          type="button"
           onClick={toggleSound}
           className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-[12.5px] font-medium text-white backdrop-blur transition hover:bg-black/75"
           aria-label={muted ? "Включить звук" : "Выключить звук"}
@@ -86,6 +134,21 @@ export function HeroVideo() {
     </>
   );
 
+
+  const modal = expanded && mode && (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm sm:p-8" role="dialog" aria-modal="true" aria-label={title} onClick={close}>
+      <div className={`relative w-full ${mobile ? "max-w-[min(420px,calc((100vh-6rem)*9/16))]" : "max-w-[min(1100px,calc((100vh-8rem)*16/9))]"}`} onClick={(e) => e.stopPropagation()}>
+        <button type="button" onClick={close} className="absolute -top-11 right-0 flex h-9 items-center gap-1.5 rounded-full bg-white/15 px-3 text-[13px] font-medium text-white transition hover:bg-white/25" aria-label="Закрыть видео">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          Закрыть
+        </button>
+        <div className={`overflow-hidden bg-black shadow-2xl ring-1 ring-white/10 ${mobile ? "aspect-[9/16] rounded-[22px]" : "aspect-video rounded-xl"}`}>
+          <video ref={big} src={mobile ? srcMobile : src} poster={mobile ? posterMobile : poster} controls playsInline loop className="h-full w-full" aria-label={title} />
+        </div>
+      </div>
+    </div>
+  );
+
   if (mobile) {
     return (
       <figure className="relative mx-auto w-full max-w-[300px]">
@@ -96,6 +159,7 @@ export function HeroVideo() {
           </div>
         </div>
         <figcaption className="sr-only">{title}</figcaption>
+        {modal}
       </figure>
     );
   }
@@ -114,6 +178,7 @@ export function HeroVideo() {
       <div className="mx-auto h-5 w-24 bg-gradient-to-b from-zinc-700 to-zinc-800 sm:h-7 sm:w-32" aria-hidden="true" />
       <div className="mx-auto h-2 w-44 rounded-t-md bg-zinc-800 sm:w-56" aria-hidden="true" />
       <figcaption className="sr-only">{title}</figcaption>
+      {modal}
     </figure>
   );
 }
