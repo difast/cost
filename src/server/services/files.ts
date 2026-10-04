@@ -37,8 +37,9 @@ export async function storeFile(opts: {
   });
 }
 
+/** Файл доступен автору и участникам рабочего пространства оценки, к которой он прикреплён. */
 export async function readFileFor(userId: string, id: string) {
-  const f = await prisma.storedFile.findFirst({ where: { id, ownerId: userId } });
+  const f = await prisma.storedFile.findFirst({ where: { id, OR: [{ ownerId: userId }, { assessment: { workspace: { members: { some: { userId } } } } }] } });
   if (!f) throw new HttpError(404, "Файл не найден");
   return f;
 }

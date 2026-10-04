@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db";
 import { api, body, ok, HttpError, type Params } from "@/server/http";
 import { requireUser } from "@/server/auth";
+import { assertFeature, getAccess } from "@/server/workspace";
 
 async function load(sid: string, userId: string) {
   const s = await prisma.adjustmentSource.findFirst({
@@ -34,6 +35,7 @@ const metaSchema = z.object({
 
 export const PATCH = api(async (req, { params }: Params<"sid">) => {
   const u = await requireUser();
+  assertFeature(await getAccess(u), "customDirectory"); // собственные редакции справочника — с тарифа «Профессиональный»
   const { sid } = await params;
   const s = await load(sid, u.id);
   if (s.ownerId !== u.id) throw new HttpError(403, "Системный справочник нельзя изменять — создайте собственную редакцию");

@@ -13,6 +13,7 @@ const SECONDARY: Array<{ href: string; label: string; icon: IconName }> = [
   { href: "/app/normative", label: "Нормативная база", icon: "book" },
   { href: "/app/sources", label: "Источники данных", icon: "database" },
   { href: "/app/profile", label: "Профиль оценщика", icon: "user" },
+  { href: "/app/workspace", label: "Тариф и команда", icon: "shield" },
 ];
 
 function Logo() {

@@ -21,7 +21,13 @@ model User {
   passwordHash   String
   name           String?
   role           String            @default("appraiser") // appraiser | admin
-  plan           String            @default("trial") // trial | basic | pro | team | corporate
+  /// Устарело: тариф хранится в подписке рабочего пространства (Subscription). Поле не используется.
+  plan           String            @default("trial")
+  /// Текущее рабочее пространство (если пользователь состоит в нескольких)
+  currentWorkspaceId String?
+  memberships    WorkspaceMember[]
+  ownedWorkspaces Workspace[]      @relation("WorkspaceOwner")
+  invitationsSent Invitation[]     @relation("InvitedBy")
   /// Системные настройки пользователя: умолчания для новых оценок и пороги контроля.
   settings       Json              @default("{}")
   organizationId String?
@@ -42,6 +48,78 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+
+// ───────────────────────────── Рабочие пространства, тарифы, приглашения
+// Рабочее пространство → участники (роль) → подписка (тариф, пробный период, статус оплаты).
+
+model Workspace {
+  id           String            @id @default(cuid())
+  name         String
+  ownerId      String
+  owner        User              @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+  members      WorkspaceMember[]
+  subscription Subscription?
+  invitations  Invitation[]
+  assessments  Assessment[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+model WorkspaceMember {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// owner | admin | member
+  role        String    @default("member")
+  createdAt   DateTime  @default(now())
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+/// Подписка рабочего пространства. Пробный период — обычный тариф + даты trial, а не отдельный тариф.
+model Subscription {
+  id                 String    @id @default(cuid())
+  workspaceId        String    @unique
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  /// basic | pro | team | corporate
+  planCode           String    @default("basic")
+  /// trialing | active | past_due | canceled | expired
+  status             String    @default("trialing")
+  trialStartsAt      DateTime?
+  trialEndsAt        DateTime?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  /// none | pending | paid | failed — заполняется платёжной системой (пока не подключена)
+  paymentStatus      String    @default("none")
+  /// Поставщик платежей и идентификатор подписки у него (для будущего биллинга)
+  provider           String?
+  providerRef        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+model Invitation {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  email       String
+  /// admin | member
+  role        String    @default("member")
+  tokenHash   String    @unique
+  invitedById String
+  invitedBy   User      @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
+  /// pending | accepted | revoked
+  status      String    @default("pending")
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId, email])
 }
 
 model Organization {
@@ -98,8 +176,12 @@ model Appraiser {
 
 model Assessment {
   id                 String                  @id @default(cuid())
+  /// Автор оценки (создатель)
   ownerId            String
   owner              User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  /// Рабочее пространство: оценки доступны его участникам согласно ролям
+  workspaceId        String
+  workspace          Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   number             String
   status             String                  @default("draft") // draft | in_progress | review | completed | archived
   propertyType       String                  @default("apartment")
@@ -140,6 +222,7 @@ model Assessment {
   updatedAt          DateTime                @updatedAt
 
   @@index([ownerId, updatedAt])
+  @@index([workspaceId, updatedAt])
 }
 
 /// Объект оценки (квартира). provenance: { field: { sourceId, at, note } }

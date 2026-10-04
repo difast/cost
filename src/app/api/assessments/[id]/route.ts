@@ -1,6 +1,8 @@
 import { prisma } from "@/server/db";
 import { api, body, ok, HttpError, type Params } from "@/server/http";
 import { requireUser } from "@/server/auth";
+import { getAccess } from "@/server/workspace";
+import { can } from "@/core/billing";
 import { assignmentSchema } from "@/server/schemas";
 import { getDetail, getOwned, syncAdjustments, updateWithAudit } from "@/server/services/assessment";
 import { logEvent } from "@/server/audit";
@@ -30,6 +32,10 @@ export const DELETE = api(async (_req, { params }: Params<"id">) => {
   const u = await requireUser();
   const { id } = await params;
   const a = await getOwned(id, u.id);
+  const access = await getAccess(u);
+  if (a.ownerId !== u.id && !(a.workspaceId === access.workspace.id && can(access.role, "deleteAnyAssessment"))) {
+    throw new HttpError(403, "Удалять чужие оценки могут только владелец и администратор рабочего пространства");
+  }
   if ((await prisma.report.count({ where: { assessmentId: id } })) > 0) {
     // оценки с выпущенными отчётами не удаляются, а архивируются
     await prisma.assessment.update({ where: { id }, data: { status: "archived" } });

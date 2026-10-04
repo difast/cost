@@ -12,10 +12,18 @@ export const notFound = (what = "Объект") => new HttpError(404, `${what} �
 
 type Handler<C> = (req: Request, ctx: C) => Promise<Response>;
 
-/** Обёртка обработчика API: единый формат ошибок. */
+/** Разделы, изменение данных в которых требует действующего пробного периода или подписки. */
+const PAID_WRITE_PREFIXES = ["/api/assessments", "/api/directory", "/api/listings", "/api/sources"];
+const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/** Обёртка обработчика API: единый формат ошибок и единая проверка доступа к изменению данных по тарифу. */
 export function api<C = unknown>(fn: Handler<C>): Handler<C> {
   return async (req, ctx) => {
     try {
+      if (MUTATING.has(req.method) && PAID_WRITE_PREFIXES.some((p) => new URL(req.url).pathname.startsWith(p))) {
+        const { assertWriteAccess } = await import("./workspace");
+        await assertWriteAccess();
+      }
       return await fn(req, ctx);
     } catch (e) {
       if (e instanceof HttpError) return NextResponse.json({ error: e.message, details: e.details }, { status: e.status });

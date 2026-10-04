@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db";
 import { api, body, ok, HttpError } from "@/server/http";
 import { requireUser } from "@/server/auth";
+import { assertFeature, getAccess } from "@/server/workspace";
 import { ensureSystemData } from "@/server/bootstrap";
 
 export const GET = api(async () => {
@@ -28,6 +29,7 @@ const cloneSchema = z.object({
 /** Новая редакция справочника = копия существующей. Старые редакции не меняются — расчёты воспроизводимы. */
 export const POST = api(async (req) => {
   const u = await requireUser();
+  assertFeature(await getAccess(u), "customDirectory"); // собственные редакции справочника — с тарифа «Профессиональный»
   const data = await body(req, cloneSchema);
   const from = await prisma.adjustmentSource.findFirst({
     where: { id: data.fromId, OR: [{ ownerId: null }, { ownerId: u.id }] },

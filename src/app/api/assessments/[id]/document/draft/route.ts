@@ -1,5 +1,6 @@
 import { api, HttpError, type Params } from "@/server/http";
 import { requireUser } from "@/server/auth";
+import { assertFeature, getAccess } from "@/server/workspace";
 import { getOwned } from "@/server/services/assessment";
 import { draftExport } from "@/server/services/reportDocument";
 
@@ -10,6 +11,7 @@ export const GET = api(async (req, { params }: Params<"id">) => {
   const u = await requireUser();
   const { id } = await params;
   await getOwned(id, u.id);
+  assertFeature(await getAccess(u), "export"); // новый экспорт — при действующем тарифе; выпущенные версии скачиваются всегда
   const format = new URL(req.url).searchParams.get("format");
   if (format !== "docx" && format !== "pdf") throw new HttpError(400, "Формат: docx или pdf");
   const f = await draftExport(id, u.id, format);

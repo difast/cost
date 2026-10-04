@@ -1,14 +1,14 @@
 import { prisma } from "@/server/db";
 import { api, ok } from "@/server/http";
-import { requireUser } from "@/server/auth";
+import { requireAccess } from "@/server/workspace";
 import type { AnalyticsRow } from "@/core/analytics";
 import type { CalcResult } from "@/core/calc/types";
 
 /** Аналоги пользователя по всем оценкам — исходные данные раздела «Аналитика». */
 export const GET = api(async () => {
-  const u = await requireUser();
+  const { workspace } = await requireAccess();
   const comps = await prisma.comparable.findMany({
-    where: { assessment: { ownerId: u.id } },
+    where: { assessment: { workspaceId: workspace.id } },
     select: {
       id: true, assessmentId: true, address: true, sourceName: true, offerDate: true, retrievedAt: true,
       price: true, area: true, rooms: true, included: true,
@@ -18,7 +18,7 @@ export const GET = api(async () => {
   });
   // Последние зафиксированные версии расчёта — для скорректированных цен
   const versions = await prisma.calculationVersion.findMany({
-    where: { calculation: { assessment: { ownerId: u.id } } },
+    where: { calculation: { assessment: { workspaceId: workspace.id } } },
     orderBy: { versionNumber: "desc" },
     select: { result: true, calculation: { select: { assessmentId: true } } },
   });

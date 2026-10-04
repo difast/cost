@@ -2,7 +2,7 @@ import Link from "next/link";
 import { fmtNumber, fmtPercent } from "@/core/format";
 import { d } from "@/core/calc/decimal";
 import { NORMATIVE_SEED } from "@/server/seed/normative";
-import { PLANS } from "@/lib/plans";
+import { PricingCards } from "./PricingCards";
 import { EXAMPLE_INPUT, EXAMPLE_SUBJECT, exampleIssues, exampleResult } from "./data";
 import { ProductTour } from "./ProductTour";
 import { HeroVideo } from "./HeroVideo";
@@ -23,7 +23,7 @@ const Section = ({ id, children, className = "", labelledBy }: { id?: string; ch
 // ───────────────────────── 2. Первый экран (с видео)
 
 const HERO_STRIP: Array<[string, string, string]> = [
-  ["Ранний доступ", "Регистрация и работа в сервисе сейчас бесплатны", "#pricing"],
+  ["7 дней бесплатно", "Пробный период на выбранном тарифе", "#pricing"],
   ["Выписка ЕГРН", "XML-выписка заполняет карточку объекта", "#features"],
   ["Проверки", "Ошибки видны до формирования отчёта", "#checks"],
   ["Отчёт", "DOCX и PDF из данных этой же оценки", "#how"],
@@ -385,38 +385,10 @@ export function Pricing() {
       <Eyebrow>Тарифы</Eyebrow>
       <H2 id="pricing-h">Для оценщика и для оценочной компании</H2>
       <p className="mt-4 max-w-2xl rounded-md border border-zinc-200 bg-white px-4 py-3 text-[14px] text-zinc-600">
-        Сейчас сервис работает в режиме раннего доступа: регистрация и работа бесплатны, приём оплаты будет подключён позже. Цены ниже — предварительные.
+        7 дней бесплатно на выбранном тарифе — без привязки карты. После пробного периода все данные сохраняются. Онлайн-оплата подключается; по вопросам оплаты и корпоративного тарифа — <a className="text-brand hover:underline" href="mailto:info@evmo.ru">info@evmo.ru</a>.
       </p>
-      <div className="-mx-5 mt-10 flex snap-x snap-mandatory scroll-px-5 gap-4 overflow-x-auto px-5 pb-2 lg:mx-0 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-0">
-        {PLANS.map((p) => (
-          <article
-            key={p.code}
-            className={`flex w-[82%] shrink-0 snap-start flex-col rounded-lg border bg-white p-6 sm:w-[48%] lg:w-auto ${p.recommended ? "border-brand ring-1 ring-brand" : "border-zinc-200"}`}
-          >
-            <div className="flex h-5 items-center">{p.recommended && <span className="rounded bg-brand-soft px-2 py-0.5 text-[11.5px] font-medium text-brand">Основной тариф</span>}</div>
-            <h3 className="mt-2 text-[16px] font-semibold text-zinc-900">{p.name}</h3>
-            <p className="mt-1 text-[13px] text-zinc-500">{p.audience}</p>
-            <div className="mt-5 flex items-baseline gap-1.5">
-              {p.pricePrefix && <span className="text-[14px] text-zinc-500">{p.pricePrefix}</span>}
-              <span className="num text-[28px] font-semibold tracking-tight text-zinc-900">{p.price} ₽</span>
-              <span className="text-[13px] text-zinc-500">/ месяц</span>
-            </div>
-            <ul className="mt-5 flex-1 space-y-2.5 text-[13.5px]">
-              {p.items.map((it) => (
-                <li key={it.text} className="flex gap-2.5">
-                  <svg className="mt-[3px] shrink-0" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke={it.status ? "#94a3b8" : "#1e6b50"} strokeWidth="2" aria-hidden="true"><path d="M3 8.5l3 3 7-7" /></svg>
-                  <span className={it.status ? "text-zinc-500" : "text-zinc-800"}>
-                    {it.text}
-                    {it.status === "planned" && <span className="ml-1.5 whitespace-nowrap text-[11.5px] text-zinc-400">— в разработке</span>}
-                    {it.status === "on_request" && <span className="ml-1.5 whitespace-nowrap text-[11.5px] text-zinc-400">— по запросу</span>}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <Link href="/register" className={`btn mt-6 py-2 ${p.recommended ? "btn-primary" : "btn-secondary"}`}>Создать аккаунт</Link>
-          </article>
-        ))}
-      </div>
+      <div className="mt-10"><PricingCards /></div>
+      <p className="mt-6 text-[13.5px]"><Link href="/pricing" className="text-brand hover:underline">Подробнее о тарифах →</Link></p>
     </Section>
   );
 }

@@ -22,19 +22,20 @@ const decStr = (v: Prisma.Decimal | null | undefined) => (v === null || v === un
 
 export const CADASTRAL_INPUT_RE = /^\d{2}:\d{2}:\d{6,7}:\d{1,6}$/;
 
+/** Оценка, доступная пользователю: она принадлежит рабочему пространству, в котором он состоит. */
 export async function getOwned(id: string, userId: string) {
-  const a = await prisma.assessment.findFirst({ where: { id, ownerId: userId } });
+  const a = await prisma.assessment.findFirst({ where: { id, workspace: { members: { some: { userId } } } } });
   if (!a) throw notFound("Оценка");
   return a;
 }
 
-export async function nextNumber(userId: string) {
+export async function nextNumber(workspaceId: string) {
   const year = new Date().getUTCFullYear();
-  const count = await prisma.assessment.count({ where: { ownerId: userId, createdAt: { gte: new Date(`${year}-01-01T00:00:00Z`) } } });
+  const count = await prisma.assessment.count({ where: { workspaceId, createdAt: { gte: new Date(`${year}-01-01T00:00:00Z`) } } });
   return `${year}-${String(count + 1).padStart(3, "0")}`;
 }
 
-export async function createAssessment(userId: string, input: { address?: string; cadastralNumber?: string; query?: string }) {
+export async function createAssessment(userId: string, input: { address?: string; cadastralNumber?: string; query?: string }, workspaceId: string) {
   await ensureSystemData();
   let { address, cadastralNumber } = input;
   if (input.query) {
@@ -57,7 +58,8 @@ export async function createAssessment(userId: string, input: { address?: string
   const a = await prisma.assessment.create({
     data: {
       ownerId: userId,
-      number: await nextNumber(userId),
+      workspaceId,
+      number: await nextNumber(workspaceId),
       valuationDate: today,
       inspectionDate: today,
       reportDate: today,

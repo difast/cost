@@ -17,7 +17,7 @@ export function Footer() {
             <li><a href="/#about" className="hover:text-zinc-900">О сервисе</a></li>
             <li><a href="/#features" className="hover:text-zinc-900">Возможности</a></li>
             <li><a href="/#how" className="hover:text-zinc-900">Как работает</a></li>
-            <li><a href="/#pricing" className="hover:text-zinc-900">Тарифы</a></li>
+            <li><Link href="/pricing" className="hover:text-zinc-900">Тарифы</Link></li>
           </ul>
         </nav>
         <nav aria-label="Информация">

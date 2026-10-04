@@ -5,11 +5,11 @@ import { useEffect, useState } from "react";
 import { BrandMark } from "@/components/BrandMark";
 
 const NAV = [
-  ["#features", "Возможности"],
-  ["#how", "Как работает"],
-  ["#pricing", "Тарифы"],
-  ["#normative", "Нормативная база"],
-  ["#faq", "Вопросы"],
+  ["/#features", "Возможности"],
+  ["/#how", "Как работает"],
+  ["/pricing", "Тарифы"],
+  ["/#normative", "Нормативная база"],
+  ["/#faq", "Вопросы"],
 ] as const;
 
 export function Logo({ className = "" }: { className?: string }) {

@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { api, body, ok, HttpError } from "@/server/http";
 import { requireUser } from "@/server/auth";
+import { assertFeature, getAccess } from "@/server/workspace";
 import { validateFormula } from "@/core/adjustments/formula";
 import { FORMULA_VARIABLES } from "@/core/adjustments/attributes";
 
@@ -32,6 +33,7 @@ const schema = z.object({
 /** Новый показатель в собственной редакции — без изменения кода расчёта. */
 export const POST = api(async (req, { params }: P) => {
   const u = await requireUser();
+  assertFeature(await getAccess(u), "customDirectory"); // собственные редакции справочника — с тарифа «Профессиональный»
   const { sid } = await params;
   const s = await prisma.adjustmentSource.findFirst({ where: { id: sid, ownerId: u.id } });
   if (!s) throw new HttpError(403, "Добавлять показатели можно только в собственную редакцию справочника");

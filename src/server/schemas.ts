@@ -45,6 +45,10 @@ export const registerSchema = z.object({
   email: z.string().trim().toLowerCase().email("Некорректный email"),
   password: z.string().min(8, "Пароль — не менее 8 символов").max(200),
   name: z.string().trim().max(200).optional(),
+  /** Тариф пробного периода (Корпоративный — только по согласованию). */
+  plan: z.enum(["basic", "pro", "team"]).optional(),
+  /** Регистрация по приглашению в рабочее пространство. */
+  invite: z.string().max(200).optional(),
 });
 export const loginSchema = z.object({ email: z.string().trim().toLowerCase(), password: z.string() });
 

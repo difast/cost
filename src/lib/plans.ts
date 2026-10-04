@@ -1,62 +1,70 @@
-// Тарифы — рабочая гипотеза. Приём оплаты пока не подключён.
+// Карточки тарифов для лендинга и страницы /pricing. Цены и лимиты — из единого источника core/billing.
+// Перечислены только возможности, которые уже есть в продукте; запланированное помечено «в разработке».
+import { CONTACT_EMAIL, PLANS as DEFS, type PlanCode } from "@/core/billing";
+
 export interface Plan {
-  code: "basic" | "pro" | "team" | "corporate";
+  code: PlanCode;
   name: string;
   price: string;
   pricePrefix?: string;
   audience: string;
-  items: Array<{ text: string; status?: "planned" | "on_request" }>;
+  users: string;
+  /** Чем отличается от соседнего (младшего) тарифа. */
+  diff: string;
+  items: Array<{ text: string; status?: "planned" }>;
   recommended?: boolean;
+  cta: { label: string; href: string };
 }
+
+const price = (c: PlanCode) => DEFS[c].priceRub.toLocaleString("ru-RU").replace(/ /g, " ");
+const trial = (c: PlanCode) => ({ label: "Попробовать 7 дней бесплатно", href: `/register?plan=${c}` });
 
 export const PLANS: Plan[] = [
   {
-    code: "basic",
-    name: "Базовый",
-    price: "1 990",
-    audience: "Для индивидуального оценщика",
+    code: "basic", name: DEFS.basic.name, price: price("basic"), audience: "Для индивидуального оценщика", users: "1 пользователь",
+    diff: "Весь основной функционал ЭВМО",
     items: [
-      { text: "Оценка квартиры сравнительным подходом" },
-      { text: "Импорт XML-выписки ЕГРН" },
-      { text: "Корректировки, расчёт и проверки" },
-      { text: "Отчёт в DOCX и PDF" },
-      { text: "Нормативная база" },
+      { text: "Создание и ведение оценок" },
+      { text: "Объект и выписка ЕГРН" },
+      { text: "Аналоги и сравнение с объектом" },
+      { text: "Корректировки по справочнику" },
+      { text: "Расчёт стоимости" },
+      { text: "Контроль качества" },
+      { text: "Отчёты и экспорт DOCX, PDF, XLSX" },
+      { text: "Версии расчётов и история изменений" },
     ],
+    cta: trial("basic"),
   },
   {
-    code: "pro",
-    name: "Профессиональный",
-    price: "4 990",
-    audience: "Для регулярной профессиональной работы",
-    recommended: true,
+    code: "pro", name: DEFS.pro.name, price: price("pro"), audience: "Для регулярной профессиональной работы", users: "1 пользователь", recommended: true,
+    diff: "Отличие от «Базового»: собственные редакции справочника корректировок",
     items: [
       { text: "Всё, что входит в «Базовый»" },
       { text: "Собственные редакции справочника корректировок" },
-      { text: "Версии расчётов и история изменений" },
       { text: "Подключение коммерческих источников данных", status: "planned" },
     ],
+    cta: trial("pro"),
   },
   {
-    code: "team",
-    name: "Команда",
-    price: "9 990",
-    audience: "Для небольшой оценочной компании",
+    code: "team", name: DEFS.team.name, price: price("team"), audience: "Для небольшой оценочной компании", users: "до 5 пользователей",
+    diff: "Отличие от «Профессионального»: работа командой до 5 человек",
     items: [
       { text: "Всё, что входит в «Профессиональный»" },
-      { text: "Несколько пользователей", status: "planned" },
-      { text: "Общие оценки и командная работа", status: "planned" },
+      { text: "Общее рабочее пространство и общие оценки" },
+      { text: "Приглашение сотрудников по email" },
+      { text: "Отдельная учётная запись у каждого участника" },
+      { text: "Роли: владелец, администратор, участник" },
     ],
+    cta: trial("team"),
   },
   {
-    code: "corporate",
-    name: "Корпоративный",
-    price: "19 990",
-    pricePrefix: "от",
-    audience: "Для крупных оценочных компаний",
+    code: "corporate", name: DEFS.corporate.name, price: price("corporate"), pricePrefix: "от", audience: "Для крупных оценочных компаний", users: "Без ограничений",
+    diff: "Отличие от «Команды»: неограниченное число пользователей",
     items: [
-      { text: "Индивидуальные условия" },
-      { text: "Шаблоны отчётов компании", status: "on_request" },
-      { text: "Подключение источников данных по договору", status: "on_request" },
+      { text: "Всё, что входит в «Команду»" },
+      { text: "Неограниченное количество пользователей" },
+      { text: "Подключение и условия согласовываются индивидуально" },
     ],
+    cta: { label: "Связаться", href: `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("Корпоративный тариф ЭВМО")}` },
   },
 ];

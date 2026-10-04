@@ -28,7 +28,11 @@ export async function loadFiles(snapshot: AssessmentSnapshot, ownerId: string): 
   for (const c of snapshot.comparables) if (c.included && c.screenshotFileId) ids.add(c.screenshotFileId);
   for (const a of snapshot.attachments) ids.add(a.fileId);
   if (snapshot.appraiser?.signatureFileId) ids.add(snapshot.appraiser.signatureFileId);
-  const files = await prisma.storedFile.findMany({ where: { id: { in: [...ids] }, ownerId } });
+  // файлы из снимка оценки: свои, прикреплённые к оценкам общего рабочего пространства и подпись автора оценки (коллеги)
+  const shared = { workspace: { members: { some: { userId: ownerId } } } };
+  const files = await prisma.storedFile.findMany({
+    where: { id: { in: [...ids] }, OR: [{ ownerId }, { assessment: shared }, { owner: { memberships: { some: shared } } }] },
+  });
   return Object.fromEntries(
     files.map((f) => [f.id, { data: Buffer.from(f.data).toString("base64"), mime: f.mime, filename: f.filename, caption: f.caption }]),
   );

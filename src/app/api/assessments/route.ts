@@ -1,15 +1,15 @@
 import { prisma } from "@/server/db";
 import { api, body, ok } from "@/server/http";
-import { requireUser } from "@/server/auth";
+import { requireAccess } from "@/server/workspace";
 import { createAssessmentSchema } from "@/server/schemas";
 import { checkSummary, createAssessment, mapLimit } from "@/server/services/assessment";
 
 export const GET = api(async (req) => {
-  const u = await requireUser();
+  const { workspace } = await requireAccess();
   const q = new URL(req.url).searchParams.get("q")?.trim();
   const list = await prisma.assessment.findMany({
     where: {
-      ownerId: u.id,
+      workspaceId: workspace.id,
       ...(q
         ? {
             OR: [
@@ -46,8 +46,8 @@ export const GET = api(async (req) => {
 });
 
 export const POST = api(async (req) => {
-  const u = await requireUser();
+  const access = await requireAccess();
   const data = await body(req, createAssessmentSchema);
-  const a = await createAssessment(u.id, data);
+  const a = await createAssessment(access.user.id, data, access.workspace.id);
   return ok({ id: a.id }, 201);
 });
