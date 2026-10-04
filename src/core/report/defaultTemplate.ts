@@ -13,8 +13,9 @@ export const DEFAULT_TEMPLATE: TemplateDefinition = {
       id: "title",
       blocks: [
         { kind: "text", text: "ОТЧЁТ № {{a.number}}", bold: true, align: "center" },
-        { kind: "text", text: "об оценке {{a.valueType}} объекта недвижимости — {{p.objectType}}, расположенного по адресу: {{p.address}}, кадастровый номер {{p.cadastralNumber}}", align: "center" },
+        { kind: "text", text: "об оценке объекта недвижимости — {{p.objectType}}, расположенного по адресу: {{p.address}}, кадастровый номер {{p.cadastralNumber}}", align: "center" },
         { kind: "text", text: "Заказчик: {{a.customerName}}", align: "center" },
+        { kind: "text", text: "Вид стоимости: {{a.valueType}}", align: "center" },
         { kind: "text", text: "Исполнитель: {{ap.fullName}}", align: "center" },
         { kind: "text", text: "Дата оценки: {{a.valuationDate|date}}. Дата составления отчёта: {{a.reportDate|date}}", align: "center" },
       ],
@@ -34,7 +35,6 @@ export const DEFAULT_TEMPLATE: TemplateDefinition = {
       id: "appraiser",
       title: "3. Сведения о заказчике и оценщике",
       blocks: [
-        { kind: "text", text: "Заказчик: {{a.customerName}}. {{a.customerDetails}}" },
         { kind: "builtin", name: "appraiserTable" },
         { kind: "text", text: "Оценщик подтверждает свою независимость в соответствии со статьёй 16 Федерального закона от 29.07.1998 № 135-ФЗ «Об оценочной деятельности в Российской Федерации»." },
       ],
@@ -127,7 +127,7 @@ export const DEFAULT_TEMPLATE: TemplateDefinition = {
       id: "final",
       title: "12. Итоговая величина стоимости",
       blocks: [
-        { kind: "text", text: "В результате проведённых расчётов {{a.valueType}} объекта оценки — {{p.objectType}}, расположенного по адресу: {{p.address}}, кадастровый номер {{p.cadastralNumber}}, общей площадью {{p.area|area}}, по состоянию на {{a.valuationDate|date}} составляет:" },
+        { kind: "text", text: "В результате проведённых расчётов итоговая величина стоимости объекта оценки (вид стоимости — {{a.valueType}}) — {{p.objectType}}, расположенного по адресу: {{p.address}}, кадастровый номер {{p.cadastralNumber}}, общей площадью {{p.area|area}}, по состоянию на {{a.valuationDate|date}} составляет:" },
         { kind: "builtin", name: "finalValue" },
         { kind: "builtin", name: "signature" },
       ],

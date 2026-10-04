@@ -7,12 +7,10 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start -p ${PORT:-3000}",
-    "start:prod": "prisma migrate deploy && node prisma/seed.mjs && next start -p ${PORT:-3000}",
-    "lint": "next lint",
+    "start:prod": "prisma migrate deploy && next start -p ${PORT:-3000}",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:migrate": "prisma migrate dev",
-    "db:seed": "node prisma/seed.mjs"
+    "db:migrate": "prisma migrate dev"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -21,6 +19,7 @@
     "docx": "^9.8.1",
     "next": "^15.5.27",
     "pdfmake": "^0.3.11",
+    "prisma": "^6.19.3",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "zod": "^4.6.5"
@@ -33,9 +32,8 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "postcss": "^8.5.28",
-    "prisma": "^6.19.3",
     "tailwindcss": "^4.3.3",
-    "typescript": "^7.0.2",
+    "typescript": "^5.9.3",
     "vitest": "^5.0.3"
   }
 }

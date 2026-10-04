@@ -279,6 +279,8 @@ const BUILTINS: Record<string, Builtin> = {
         const st = rc.steps.find((x) => x.code === code);
         return st ? fmtPercent(st.value, 2, true) : "—";
       })]);
+      const allZero = res.comparables.every((rc) => d(rc.steps.find((x) => x.code === code)?.value ?? "0").isZero());
+      if (allZero) continue;
       rows.push([`Цена после корректировки, ₽/м²`, ...res.comparables.map((rc) => {
         const st = rc.steps.find((x) => x.code === code);
         return st ? fmtNumber(st.after) : "—";
@@ -322,7 +324,14 @@ const BUILTINS: Record<string, Builtin> = {
     const blocks: ReportBlock[] = [];
     for (const rc of c.result.comparables) {
       blocks.push({ type: "paragraph", text: rc.label, bold: true });
-      const lines = [`Цена за 1 м²: ${rc.unitPriceFormula} ₽`, ...rc.steps.map((st) => `${st.name}: ${st.formula} ₽`), `Скорректированная цена: ${fmtNumber(rc.adjustedUnitPrice)} ₽/м²`];
+      const nonZero = rc.steps.filter((st) => !d(st.value).isZero());
+      const zeroNames = rc.steps.filter((st) => d(st.value).isZero()).map((st) => st.name.toLowerCase());
+      const lines = [
+        `Цена за 1 м²: ${rc.unitPriceFormula} ₽`,
+        ...nonZero.map((st) => `${st.name}: ${st.formula} ₽`),
+        ...(zeroNames.length ? [`Корректировки, равные 0 %: ${zeroNames.join(", ")}.`] : []),
+        `Скорректированная цена: ${fmtNumber(rc.adjustedUnitPrice)} ₽/м²`,
+      ];
       for (const l of lines) blocks.push({ type: "paragraph", text: l, size: "small" });
     }
     return blocks;
@@ -331,9 +340,9 @@ const BUILTINS: Record<string, Builtin> = {
   weightsTable: (c) => {
     const r = c.result;
     const methods: Record<string, string> = {
-      equal: "равные веса: wᵢ = 1 / n",
-      inverse_gross: "обратно пропорционально валовой корректировке: wᵢ = (1 / (1 + Σ|корр|ᵢ)) / Σⱼ(1 / (1 + Σ|корр|ⱼ))",
-      linear_gross: "wᵢ = (S − sᵢ) / ((n − 1) · S), где sᵢ — валовая корректировка аналога, S = Σ sᵢ",
+      equal: "равные веса: w_i = 1 / n",
+      inverse_gross: "обратно пропорционально валовой корректировке: w_i = (1 / (1 + Σ|корр|_i)) / Σ_j(1 / (1 + Σ|корр|_j))",
+      linear_gross: "w_i = (S − s_i) / ((n − 1) · S), где s_i — валовая корректировка аналога, S = Σ s_i",
       manual: "веса заданы оценщиком",
     };
     return [
