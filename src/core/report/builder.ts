@@ -11,6 +11,7 @@ import type { AssessmentSnapshot } from "../snapshot";
 import { fmtDistance, type InfrastructureSnapshot } from "../infrastructure";
 import type { ReportBlock, ReportDoc, TemplateDefinition } from "./model";
 import { WEIGHT_METHODS } from "../calc/weights";
+import { calcQuality, DISPERSION_MESSAGE } from "../calc/quality";
 
 export interface ReportFile {
   data: string; // base64
@@ -27,6 +28,8 @@ export interface BuildContext {
   /** Файлы по id (фото, скриншоты, подпись). */
   files: Record<string, ReportFile>;
   generatedAt: string;
+  /** Нормативные документы (справочные данные сервиса на момент формирования). */
+  normative?: Array<{ code: string | null; title: string; issuer: string | null; adoptedAt: string | null; url: string | null }>;
 }
 
 const dash = (v: unknown) => (v === null || v === undefined || v === "" ? "—" : String(v));
@@ -189,8 +192,9 @@ const BUILTINS: Record<string, Builtin> = {
     ];
   },
 
-  locationTable: (c) => {
+  locationTable: (c, opts) => {
     const p = c.snapshot.property;
+    const withInfra = opts.infrastructure !== false;
     return [
       {
         type: "kv",
@@ -201,8 +205,95 @@ const BUILTINS: Record<string, Builtin> = {
           ...(p.latitude && p.longitude ? [["Координаты (широта, долгота)", `${p.latitude}, ${p.longitude}`] as [string, string]] : []),
         ],
       },
-      ...infrastructureBlocks(p.infrastructure),
+      ...(withInfra ? infrastructureBlocks(p.infrastructure) : []),
     ];
+  },
+
+  /** Окружение: инфраструктура из картографического сервиса (если получена). */
+  environmentTable: (c) => {
+    const blocks = infrastructureBlocks(c.snapshot.property.infrastructure);
+    return blocks.length ? blocks : [{ type: "paragraph", italic: true, text: "Сведения об инфраструктуре окружения не получены." }];
+  },
+
+  /** Правовые и регистрационные сведения: права, обременения, источники ЕГРН. */
+  rightsTable: (c) => {
+    const p = c.snapshot.property;
+    const egrn = c.snapshot.sources.filter((x) => x.kind.startsWith("egrn"));
+    return [
+      { type: "kv", rows: [
+        ["Кадастровый номер", dash(p.cadastralNumber)],
+        ["Вид права", dash(p.rights)],
+        ["Правообладатель", dash(p.rightHolders)],
+        ["Обременения (ограничения)", dash(p.encumbrances)],
+        ["Кадастровый номер здания", dash(c.snapshot.building.cadastralNumber)],
+      ] },
+      ...(egrn.length
+        ? [{ type: "table" as const, small: true, header: ["Документ", "Дата получения"], rows: egrn.map((x) => [x.title, fmtDate(x.retrievedAt)]), widths: [4, 1.5] }]
+        : [{ type: "paragraph" as const, italic: true, text: "Выписка ЕГРН к оценке не приложена." }]),
+    ];
+  },
+
+  /** Корректировки по каждому аналогу: фактор, объект, аналог, коэффициент, корректировка, основание. */
+  adjustmentsDetail: (c) => {
+    const blocks: ReportBlock[] = [];
+    for (const cp of comparablesInCalc(c)) {
+      blocks.push({ type: "paragraph", bold: true, text: `${cp.label}: ${dash(cp.address)}` });
+      const rows = cp.adjustments.map((a) => {
+        const rs = a.ruleSnapshot as { sourceName?: string; edition?: string; isDemo?: boolean; factor?: { reference?: string | null } } | null;
+        const basis = a.notRequired
+          ? `Не требуется: ${a.comment ?? "—"}`
+          : a.overridden
+            ? `Оценщик: ${a.comment ?? "—"} (автоматически ${a.suggestedValue !== null ? fmtPercent(a.suggestedValue, 2, true) : "не определено"})`
+            : rs?.sourceName
+              ? `${rs.sourceName}, ред. ${rs.edition}${rs.factor?.reference ? `, ${rs.factor.reference}` : ""}${rs.isDemo ? " (демонстрационные значения)" : ""}`
+              : "Экспертное суждение оценщика";
+        return [a.factorName, dash(a.subjectValue), dash(a.comparableValue), fmtNumber(d(1).plus(a.value), 4), fmtPercent(a.value, 2, true), basis];
+      });
+      blocks.push({ type: "table", small: true, header: ["Фактор", "Объект оценки", "Аналог", "Коэффициент", "Корректировка", "Основание"], rows, widths: [2.2, 2, 2, 1.3, 1.4, 3.6] });
+    }
+    return blocks;
+  },
+
+  /** Расчёт по аналогам: цена за м² → итоговая корректировка → скорректированная цена → вес → вклад. */
+  calculationTable: (c) => {
+    const r = c.result;
+    return [{
+      type: "table", small: true, boldLastRow: true,
+      header: ["Аналог", "Цена за м², ₽", "Корректировка", "Скорректированная цена, ₽/м²", "Вес", "Вклад, ₽/м²"],
+      rows: [
+        ...r.comparables.map((x) => [x.label, fmtNumber(x.unitPrice), fmtPercent(x.totalChange, 2, true), fmtNumber(x.adjustedUnitPrice), fmtNumber(x.weight, r.settings.weightDecimals), fmtNumber(x.contribution)]),
+        ["Итого", "", "", "", fmtNumber(r.weightsSum, r.settings.weightDecimals), fmtNumber(r.weightedUnitPrice)],
+      ],
+      widths: [1.6, 1.6, 1.4, 2.2, 1, 1.6],
+    }];
+  },
+
+  /** Контроль расчёта и результаты автоматических проверок. */
+  qualityTable: (c) => {
+    const q = calcQuality(c.result);
+    const rows: Array<[string, string]> = [
+      ["Количество аналогов", String(q.count)],
+      ["Диапазон исходных цен, ₽/м²", `${fmtNumber(q.rawMin)} – ${fmtNumber(q.rawMax)}`],
+      ["Диапазон скорректированных цен, ₽/м²", `${fmtNumber(q.adjustedMin)} – ${fmtNumber(q.adjustedMax)}`],
+      ["Средняя скорректированная цена, ₽/м²", fmtNumber(q.adjustedMean)],
+      ["Средневзвешенная цена, ₽/м²", fmtNumber(q.weighted)],
+      ["Наибольшая корректировка", q.maxAdjustment ? `${fmtPercent(q.maxAdjustment.value, 2, true)} (${q.maxAdjustment.label}, ${q.maxAdjustment.factor})` : "—"],
+      ["Наименьшая корректировка", q.minAdjustment ? `${fmtPercent(q.minAdjustment.value, 2, true)} (${q.minAdjustment.label}, ${q.minAdjustment.factor})` : "—"],
+      ["Наибольшая валовая корректировка аналога", fmtPercent(q.maxGross)],
+      ["Коэффициент вариации до корректировок", fmtPercent(q.cvBefore)],
+      ["Коэффициент вариации после корректировок", fmtPercent(q.cvAfter)],
+      ["Автоматические проверки", `ошибок ${c.checks.errors}, предупреждений ${c.checks.warnings}`],
+    ];
+    const out: ReportBlock[] = [{ type: "kv", rows }];
+    if (q.dispersionGrew) out.push({ type: "paragraph", italic: true, text: DISPERSION_MESSAGE });
+    return out;
+  },
+
+  /** Нормативные документы, на которые опирается оценка (с реквизитами и источником). */
+  normativeTable: (c) => {
+    const n = c.normative ?? [];
+    if (!n.length) return [{ type: "paragraph", italic: true, text: "Перечень нормативных документов не загружен." }];
+    return [{ type: "table", small: true, header: ["Документ", "Реквизиты", "Источник"], rows: n.map((x) => [x.title, [x.issuer, x.adoptedAt ? `от ${fmtDate(x.adoptedAt)}` : null].filter(Boolean).join(", ") || "—", x.url ?? "—"]), widths: [5, 3, 3] }];
   },
 
   marketAnalysis: (c) => {
@@ -404,7 +495,9 @@ const BUILTINS: Record<string, Builtin> = {
     const rows: string[][] = [];
     for (const src of s.sources) rows.push([src.title, dash(src.url), fmtDate(src.retrievedAt), dash(src.note)]);
     for (const cp of comparablesInCalc(c)) rows.push([`${cp.label}: ${dash(cp.sourceName)}`, dash(cp.sourceUrl), fmtDate(cp.retrievedAt), dash(cp.address)]);
-    if (s.directory) rows.push([`Справочник корректировок: ${s.directory.name}`, s.directory.publisher ?? "—", fmtDate(s.directory.actualDate), `редакция ${s.directory.edition}`]);
+    if (s.directory) rows.push([`Справочник корректировок: ${s.directory.name}`, s.directory.publisher ?? "—", fmtDate(s.directory.actualDate), `редакция ${s.directory.edition}${s.directory.isDemo ? ", демонстрационные значения" : ""}`]);
+    const infra = s.property.infrastructure;
+    if (infra) rows.push([`Инфраструктура окружения: ${infra.providerTitle}`, "—", fmtDate(infra.retrievedAt), "расстояния по прямой"]);
     return [{ type: "table", small: true, header: ["Источник", "Ссылка / издатель", "Дата", "Примечание"], rows, widths: [3, 4, 1.5, 2.5] }];
   },
 
@@ -413,7 +506,9 @@ const BUILTINS: Record<string, Builtin> = {
       type: "paragraph",
       size: "small",
       italic: true,
-      text: `Расчёт выполнен ядром ${c.result.engineVersion}, версия расчёта № ${c.versionNumber}. Все промежуточные значения приведены в отчёте и могут быть проверены вручную.`,
+      text: c.versionNumber
+        ? `Расчёт выполнен ядром ${c.result.engineVersion}, версия расчёта № ${c.versionNumber}. Все промежуточные значения приведены в отчёте и могут быть проверены вручную.`
+        : `Предварительный расчёт (ядро ${c.result.engineVersion}): версия расчёта ещё не подтверждена.`,
     },
   ],
 
@@ -466,6 +561,14 @@ function isImage(mime: string) {
 }
 
 export const BUILTIN_NAMES = Object.keys(BUILTINS);
+
+/** Встроенный блок по имени — используется шаблоном и рабочим документом отчёта. */
+export function renderBuiltin(name: string, c: BuildContext, opts: Record<string, unknown> = {}): ReportBlock[] {
+  const fn = BUILTINS[name];
+  if (!fn) throw new Error(`Неизвестный блок отчёта: ${name}`);
+  return fn(c, opts);
+}
+export const reportFooter = (s: AssessmentSnapshot) => `Отчёт № ${s.assessment.number} · дата оценки ${fmtDate(s.assessment.valuationDate)} · ${dash(s.property.cadastralNumber)}`;
 
 export function buildReport(def: TemplateDefinition, c: BuildContext): ReportDoc {
   const s = c.snapshot;

@@ -97,13 +97,13 @@ model Appraiser {
 // ───────────────────────────── Оценка
 
 model Assessment {
-  id                 String            @id @default(cuid())
+  id                 String                  @id @default(cuid())
   ownerId            String
-  owner              User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner              User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   number             String
-  status             String            @default("draft") // draft | in_progress | review | completed | archived
-  propertyType       String            @default("apartment")
-  approach           String            @default("comparative")
+  status             String                  @default("draft") // draft | in_progress | review | completed | archived
+  propertyType       String                  @default("apartment")
+  approach           String                  @default("comparative")
   // Задание на оценку
   customerName       String?
   customerDetails    String?
@@ -112,8 +112,8 @@ model Assessment {
   contractDate       DateTime?
   purpose            String? // цель оценки
   intendedUse        String? // предполагаемое использование результата
-  valueType          String?           @default("Рыночная стоимость")
-  rightsAssessed     String?           @default("Право собственности")
+  valueType          String?                 @default("Рыночная стоимость")
+  rightsAssessed     String?                 @default("Право собственности")
   valuationDate      DateTime?
   inspectionDate     DateTime?
   reportDate         DateTime?
@@ -122,7 +122,7 @@ model Assessment {
   marketAnalysis     String? // анализ рынка (текст оценщика)
   // Справочник корректировок (редакция), действующий для этой оценки
   adjustmentSourceId String?
-  adjustmentSource   AdjustmentSource? @relation(fields: [adjustmentSourceId], references: [id])
+  adjustmentSource   AdjustmentSource?       @relation(fields: [adjustmentSourceId], references: [id])
   property           Property?
   building           Building?
   comparables        Comparable[]
@@ -132,10 +132,12 @@ model Assessment {
   calculation        Calculation?
   listingSearches    ListingSearch[]
   reports            Report[]
+  reportDocument     ReportDocument?
+  reportVersions     ReportDocumentVersion[]
   events             AssessmentEvent[]
   files              StoredFile[]
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
 
   @@index([ownerId, updatedAt])
 }
@@ -440,18 +442,19 @@ model Calculation {
 
 /// Зафиксированная версия расчёта: полный снимок входа + результат + хэш.
 model CalculationVersion {
-  id            String      @id @default(cuid())
-  calculationId String
-  calculation   Calculation @relation(fields: [calculationId], references: [id], onDelete: Cascade)
-  versionNumber Int
-  engineVersion String
-  inputHash     String
-  snapshot      Json
-  result        Json
-  createdById   String?
-  note          String?
-  reports       Report[]
-  createdAt     DateTime    @default(now())
+  id               String                  @id @default(cuid())
+  calculationId    String
+  calculation      Calculation             @relation(fields: [calculationId], references: [id], onDelete: Cascade)
+  versionNumber    Int
+  engineVersion    String
+  inputHash        String
+  snapshot         Json
+  result           Json
+  createdById      String?
+  note             String?
+  reports          Report[]
+  documentVersions ReportDocumentVersion[]
+  createdAt        DateTime                @default(now())
 
   @@unique([calculationId, versionNumber])
 }
@@ -479,8 +482,10 @@ model Report {
   calculationVersion   CalculationVersion @relation(fields: [calculationVersionId], references: [id])
   templateId           String
   template             ReportTemplate     @relation(fields: [templateId], references: [id])
-  format               String // docx | pdf
+  format               String // docx | pdf | xlsx
   fileId               String
+  /// Версия рабочего документа, из которой сформирован файл (null — отчёт по шаблону без документа).
+  documentVersionId    String?
   checks               Json
   createdById          String?
   createdAt            DateTime           @default(now())
@@ -577,6 +582,8 @@ model GarHierarchy {
 }
 
 /// Плоский справочник адресов домов для поиска (строится из трёх таблиц выше).
+/// Индексы GarAddress_normalized_fts_idx (GIN) и GarAddress_normalized_prefix_idx созданы в миграции вручную —
+/// при генерации новых миграций удаляйте из них строки DROP INDEX для этих индексов.
 model GarAddress {
   objectId     BigInt  @id
   guid         String  @unique
@@ -641,4 +648,42 @@ model RosstatValue {
 
   @@unique([seriesId, regionName, period])
   @@index([regionName, period])
+}
+
+/// Рабочий документ отчёта (один на оценку): структура, ручные правки, статус.
+/// Автоматические данные не копируются — подставляются из оценки при каждом открытии.
+model ReportDocument {
+  id           String     @id @default(cuid())
+  assessmentId String     @unique
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  /// draft | review | approved | final
+  status       String     @default("draft")
+  content      Json
+  updatedById  String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+/// Зафиксированная версия отчёта: документ, подтверждённый расчёт и файлы DOCX/PDF/XLSX из одного снимка.
+model ReportDocumentVersion {
+  id                   String             @id @default(cuid())
+  assessmentId         String
+  assessment           Assessment         @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  versionNumber        Int
+  /// Статус документа на момент фиксации: review | approved | final
+  status               String
+  calculationVersionId String
+  calculationVersion   CalculationVersion @relation(fields: [calculationVersionId], references: [id])
+  /// Структура и правки документа на момент фиксации
+  content              Json
+  /// Итоговая модель документа (ReportDoc), из которой построены все файлы
+  rendered             Json
+  docxFileId           String?
+  pdfFileId            String?
+  xlsxFileId           String?
+  note                 String?
+  createdById          String?
+  createdAt            DateTime           @default(now())
+
+  @@unique([assessmentId, versionNumber])
 }

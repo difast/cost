@@ -3,7 +3,6 @@ import { prisma } from "../db";
 import { HttpError } from "../http";
 import { logEvent } from "../audit";
 import { ensureSystemData } from "../bootstrap";
-import { commitVersion, evaluate } from "./assessment";
 import { storeFile } from "./files";
 import { buildReport, type ReportFile } from "@/core/report/builder";
 import { renderDocx } from "@/core/report/renderDocx";
@@ -14,7 +13,7 @@ import type { TemplateDefinition } from "@/core/report/model";
 import type { AssessmentSnapshot } from "@/core/snapshot";
 import type { CalcResult } from "@/core/calc/types";
 
-async function activeTemplate() {
+export async function activeTemplate() {
   await ensureSystemData();
   const t = await prisma.reportTemplate.findFirst({
     where: { code: DEFAULT_TEMPLATE_CODE, isActive: true },
@@ -24,7 +23,7 @@ async function activeTemplate() {
   return t;
 }
 
-async function loadFiles(snapshot: AssessmentSnapshot, ownerId: string): Promise<Record<string, ReportFile>> {
+export async function loadFiles(snapshot: AssessmentSnapshot, ownerId: string): Promise<Record<string, ReportFile>> {
   const ids = new Set<string>();
   for (const c of snapshot.comparables) if (c.included && c.screenshotFileId) ids.add(c.screenshotFileId);
   for (const a of snapshot.attachments) ids.add(a.fileId);
@@ -36,17 +35,6 @@ async function loadFiles(snapshot: AssessmentSnapshot, ownerId: string): Promise
 }
 
 const safeName = (s: string) => s.replace(/[^\p{L}\p{N}._-]+/gu, "_");
-
-/** Сформировать отчёт по текущим данным: проверки → фиксация версии → DOCX/PDF. */
-export async function generateReport(assessmentId: string, userId: string, formats: Array<"docx" | "pdf">) {
-  // Сначала проверки: версия с ошибками не фиксируется.
-  const pre = await evaluate(assessmentId);
-  if (!pre.checks.canGenerate) {
-    throw new HttpError(422, `Отчёт не может быть сформирован: ошибок — ${pre.checks.errors}`, pre.checks.issues);
-  }
-  const { version, checks, snapshot } = await commitVersion(assessmentId, userId);
-  return renderForVersion({ versionId: version.id, versionNumber: version.versionNumber, snapshot, result: checks.result!, userId, assessmentId, formats });
-}
 
 /** Повторно сформировать отчёт по зафиксированной версии (те же данные и коэффициенты). */
 export async function regenerateFromVersion(assessmentId: string, versionId: string, userId: string, formats: Array<"docx" | "pdf">) {

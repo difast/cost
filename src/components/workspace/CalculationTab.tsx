@@ -6,6 +6,7 @@ import { fmtNumber, fmtPercent, amountInWords } from "@/core/format";
 import { d } from "@/core/calc/decimal";
 import type { CalcSettings } from "@/core/calc/types";
 import { WEIGHT_METHODS, WEIGHT_ROUNDING_NOTE } from "@/core/calc/weights";
+import { BLOCKED_MESSAGE, DISPERSION_MESSAGE, calcQuality } from "@/core/calc/quality";
 import { Icon } from "@/components/ui/Icon";
 import { Badge, EmptyState, Notice, Panel, toast } from "@/components/ui/kit";
 import { NextStep, StepIssues } from "./common";
@@ -40,7 +41,7 @@ export function CalculationTab({ detail, calc, reload, checklist, go }: WsProps)
     setError(null);
     try {
       const v = await api.post<{ versionNumber: number; created: boolean }>(`/api/assessments/${detail.id}/calculation`, {});
-      toast(v.created ? `Зафиксирована версия расчёта № ${v.versionNumber}` : "Версия уже актуальна", "info");
+      toast(v.created ? `Расчёт подтверждён: версия № ${v.versionNumber}` : "Расчёт уже подтверждён", "info");
       await reload();
     } catch (e) {
       setError(errorText(e));
@@ -51,6 +52,39 @@ export function CalculationTab({ detail, calc, reload, checklist, go }: WsProps)
 
   const calcErrors = calc.issues.filter((i) => i.section === "calculation" && i.severity === "error");
   const versions = detail.calculation?.versions ?? [];
+  const allErrors = calc.issues.filter((i) => i.severity === "error");
+  const latest = versions[0] ?? null;
+  const q = r ? calcQuality(r) : null;
+  const confirmBar = r && (
+    <section className={`card mb-4 flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center ${calc.isStale ? (allErrors.length ? "border-err/30" : "border-warn/40") : "border-ok/30"}`}>
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${calc.isStale ? (allErrors.length ? "bg-err-soft text-err" : "bg-warn-soft text-warn") : "bg-ok-soft text-ok"}`}>
+        <Icon name={calc.isStale ? (allErrors.length ? "error" : "alert") : "check"} size={16} />
+      </span>
+      <div className="min-w-0 flex-1 text-[13px]">
+        {!calc.isStale && latest ? (
+          <>
+            <div className="font-medium text-ink">Расчёт подтверждён: версия № {latest.versionNumber}</div>
+            <div className="text-muted">{latest.createdByName ?? "оценщик"} · {new Date(latest.createdAt).toLocaleString("ru-RU")} · снимок данных неизменен, отчёт формируется из него</div>
+          </>
+        ) : (
+          <>
+            <div className="font-medium text-ink">{latest ? `Данные изменились после подтверждения версии № ${latest.versionNumber} — расчёт требует обновления` : "Расчёт ещё не подтверждён"}</div>
+            <div className={allErrors.length ? "text-err" : "text-muted"}>
+              {allErrors.length ? `${BLOCKED_MESSAGE} Ошибок: ${allErrors.length}.` : "При подтверждении сохраняется неизменяемый снимок: объект, аналоги, корректировки, коэффициенты, веса, формулы и итог."}
+            </div>
+          </>
+        )}
+      </div>
+      <div className="flex shrink-0 flex-wrap gap-2">
+        {allErrors.length > 0 && <button className="btn btn-secondary" onClick={() => go("checks")}>Ошибки</button>}
+        {calc.isStale ? (
+          <button className="btn btn-primary" disabled={busy || allErrors.length > 0} onClick={commit}><Icon name="check" size={15} />Подтвердить расчёт</button>
+        ) : (
+          <a className="btn btn-secondary" href={`/api/assessments/${detail.id}/calculation/xlsx`}><Icon name="download" size={15} />Расчёт XLSX</a>
+        )}
+      </div>
+    </section>
+  );
 
   const settingsPanel = (
     <Panel title="Параметры расчёта">
@@ -102,6 +136,7 @@ export function CalculationTab({ detail, calc, reload, checklist, go }: WsProps)
       {error && <Notice tone="err" className="mb-4">{error}</Notice>}
       {calcErrors.length > 0 && <Notice tone="err" className="mb-4" title="Расчёт содержит ошибки">{calcErrors.map((i, k) => <div key={k}>{i.message}</div>)}</Notice>}
 
+      {confirmBar}
       {!r ? (
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="card">
@@ -200,7 +235,7 @@ export function CalculationTab({ detail, calc, reload, checklist, go }: WsProps)
                         <tr className="border-b border-line/70"><td className="py-1 text-muted">Цена 1 м²</td><td className="tnum py-1 pl-2 text-right text-muted">{c.unitPriceFormula}</td></tr>
                         {c.steps.filter((st) => !d(st.value).isZero()).map((st) => (
                           <tr key={st.code} className="border-b border-line/70">
-                            <td className="py-1">{st.name} <span className={`num ${d(st.value).isNeg() ? "text-err" : "text-ok"}`}>{fmtPercent(st.value, 2, true)}</span></td>
+                            <td className="py-1"><span className="num text-zinc-700">× {fmtNumber(d(1).plus(st.value), 4)}</span> — {st.name.toLowerCase()} <span className={`num ${d(st.value).isNeg() ? "text-err" : "text-ok"}`}>({fmtPercent(st.value, 2, true)})</span></td>
                             <td className="num py-1 text-right">{fmtNumber(st.after)}</td>
                           </tr>
                         ))}
@@ -217,6 +252,44 @@ export function CalculationTab({ detail, calc, reload, checklist, go }: WsProps)
           {r.warnings.length > 0 && (
             <Notice tone="warn" className="mt-4" title="Замечания к выборке">{r.warnings.map((w) => <div key={w}>{w}</div>)}</Notice>
           )}
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <Panel title="Формула итоговой стоимости">
+              <dl className="space-y-3 text-[13px]">
+                <div>
+                  <dt className="text-muted">Итоговая цена 1 м² = Σ (скорректированная цена аналога × вес)</dt>
+                  <dd className="tnum mt-0.5 break-words text-ink">{r.weightedUnitPriceFormula} ₽/м²</dd>
+                </div>
+                <div>
+                  <dt className="text-muted">Веса: {WEIGHT_METHODS[r.settings.weightMethod].label.toLowerCase()}</dt>
+                  <dd className="tnum break-words mt-0.5 text-ink">{WEIGHT_METHODS[r.settings.weightMethod].formula}; сумма весов {r.weightsSum.replace(".", ",")}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted">Итоговая стоимость = итоговая цена 1 м² × площадь объекта ({fmtNumber(r.subjectArea, 2, true)} м², карточка объекта)</dt>
+                  <dd className="tnum mt-0.5 break-words text-ink">{r.rawValueFormula} ₽ → {r.finalValueFormula} ₽</dd>
+                </div>
+                <div className="text-[12px] text-muted">Источники: цены и площади аналогов — карточки аналогов (снимок объявления); коэффициенты — {detail.adjustmentSource ? `${detail.adjustmentSource.name}, ред. ${detail.adjustmentSource.edition}${detail.adjustmentSource.isDemo ? " (демонстрационные значения)" : ""}` : "справочник не выбран"} и ручные значения оценщика с обоснованием.</div>
+              </dl>
+            </Panel>
+            {q && (
+              <Panel title="Контроль расчёта">
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[12.5px]">
+                  <div><dt className="text-muted">Аналогов</dt><dd className="tnum break-words text-ink">{q.count}</dd></div>
+                  <div><dt className="text-muted">Средневзвешенная цена</dt><dd className="tnum break-words text-ink">{fmtNumber(q.weighted, 0)} ₽/м²</dd></div>
+                  <div><dt className="text-muted">Исходные цены</dt><dd className="tnum break-words text-ink">{fmtNumber(q.rawMin, 0)} – {fmtNumber(q.rawMax, 0)}</dd></div>
+                  <div><dt className="text-muted">Скорректированные цены</dt><dd className="tnum break-words text-ink">{fmtNumber(q.adjustedMin, 0)} – {fmtNumber(q.adjustedMax, 0)}</dd></div>
+                  <div><dt className="text-muted">Средняя скорректированная</dt><dd className="tnum break-words text-ink">{fmtNumber(q.adjustedMean, 0)} ₽/м²</dd></div>
+                  <div><dt className="text-muted">Наибольшая валовая корректировка</dt><dd className="tnum break-words text-ink">{fmtPercent(q.maxGross)}</dd></div>
+                  <div className="col-span-2"><dt className="text-muted">Наибольшая / наименьшая корректировка</dt><dd className="tnum break-words text-ink">{q.maxAdjustment ? `${fmtPercent(q.maxAdjustment.value, 2, true)} (${q.maxAdjustment.label}, ${q.maxAdjustment.factor.toLowerCase()})` : "—"} / {q.minAdjustment ? `${fmtPercent(q.minAdjustment.value, 2, true)} (${q.minAdjustment.label}, ${q.minAdjustment.factor.toLowerCase()})` : "—"}</dd></div>
+                  <div className="col-span-2"><dt className="text-muted">Суммарные корректировки по аналогам (итог / валовая)</dt><dd className="tnum break-words text-ink">{q.perComparable.map((x) => `${x.label}: ${fmtPercent(x.totalChange, 1, true)} / ${fmtPercent(x.grossAdjustment, 1)}`).join("; ")}</dd></div>
+                  <div><dt className="text-muted">Разброс до корректировок</dt><dd className="tnum break-words text-ink">коэф. вариации {fmtPercent(q.cvBefore)}</dd></div>
+                  <div><dt className="text-muted">Разброс после корректировок</dt><dd className={`tnum break-words ${q.dispersionGrew ? "text-warn" : "text-ink"}`}>коэф. вариации {fmtPercent(q.cvAfter)}</dd></div>
+                </dl>
+                {q.dispersionGrew && <Notice tone="warn" className="mt-3">{DISPERSION_MESSAGE}</Notice>}
+                {allErrors.length > 0 && <Notice tone="err" className="mt-3">{BLOCKED_MESSAGE}</Notice>}
+              </Panel>
+            )}
+          </div>
         </>
       )}
 
@@ -225,8 +298,8 @@ export function CalculationTab({ detail, calc, reload, checklist, go }: WsProps)
         title="Версии расчёта"
         description="Версия хранит полный снимок данных и коэффициентов — старую оценку можно воспроизвести в точности"
         actions={
-          <button className="btn btn-secondary btn-sm" disabled={busy || !r || !calc.isStale} onClick={commit}>
-            {calc.isStale ? <><Icon name="check" size={14} />Зафиксировать версию</> : "Версия актуальна"}
+          <button className="btn btn-secondary btn-sm" disabled={busy || !r || !calc.isStale || allErrors.length > 0} onClick={commit} title={allErrors.length ? BLOCKED_MESSAGE : undefined}>
+            {calc.isStale ? <><Icon name="check" size={14} />Подтвердить расчёт</> : "Версия актуальна"}
           </button>
         }
         bodyClassName=""
@@ -234,16 +307,18 @@ export function CalculationTab({ detail, calc, reload, checklist, go }: WsProps)
         {versions.length ? (
           <div className="overflow-x-auto">
             <table className="tbl min-w-[640px]">
-              <thead><tr><th>Версия</th><th>Дата</th><th className="text-right">Стоимость, ₽</th><th className="text-right">₽/м²</th><th>Ядро расчёта</th><th>Хэш входных данных</th></tr></thead>
+              <thead><tr><th>Версия</th><th>Дата</th><th>Подтвердил</th><th className="text-right">Стоимость, ₽</th><th className="text-right">₽/м²</th><th>Ядро расчёта</th><th>Хэш входных данных</th><th className="w-0"></th></tr></thead>
               <tbody>
                 {versions.map((v) => (
                   <tr key={v.id}>
                     <td className="font-medium">№ {v.versionNumber} {calc.latestVersion?.id === v.id && !calc.isStale && <Badge tone="ok">актуальна</Badge>}</td>
                     <td className="num">{new Date(v.createdAt).toLocaleString("ru-RU")}</td>
+                    <td className="text-[12.5px]">{v.createdByName ?? "—"}</td>
                     <td className="num text-right">{fmtNumber(v.result.finalValue, 0)}</td>
                     <td className="num text-right">{fmtNumber(v.result.finalUnitPrice, 0)}</td>
                     <td className="text-[12px] text-muted">{v.engineVersion}</td>
                     <td className="font-mono text-[12px] text-muted">{v.inputHash.slice(0, 12)}</td>
+                    <td><a className="btn btn-ghost btn-sm" href={`/api/assessments/${detail.id}/calculation/xlsx?versionId=${v.id}`}><Icon name="download" size={13} />XLSX</a></td>
                   </tr>
                 ))}
               </tbody>

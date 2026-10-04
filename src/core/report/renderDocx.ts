@@ -131,6 +131,8 @@ export async function renderDocx(doc: ReportDoc): Promise<Buffer> {
                 children: [
                   new TextRun({ text: doc.footer + " · стр. ", size: 16, font: FONT, color: "666666" }),
                   new TextRun({ children: [PageNumber.CURRENT], size: 16, font: FONT, color: "666666" }),
+                  new TextRun({ text: " из ", size: 16, font: FONT, color: "666666" }),
+                  new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 16, font: FONT, color: "666666" }),
                 ],
               }),
             ],

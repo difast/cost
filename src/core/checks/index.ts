@@ -2,7 +2,8 @@
 // Ошибки (error) блокируют формирование отчёта, предупреждения (warning) — нет.
 
 import { d, round } from "../calc/decimal";
-import { calculate, CalcError, computeStats } from "../calc/engine";
+import { calculate, CalcError } from "../calc/engine";
+import { calcQuality, DISPERSION_MESSAGE } from "../calc/quality";
 import { describeCategory, type ObjectFeatures } from "../adjustments/attributes";
 import type { CalcInput, CalcResult } from "../calc/types";
 import { fmtDate, fmtNumber, fmtPercent } from "../format";
@@ -10,9 +11,15 @@ import type { AssessmentSnapshot, SnapshotComparable } from "../snapshot";
 
 /** Порог одной корректировки без диапазона в справочнике (доля) — выше предупреждение. */
 export const SINGLE_ADJUSTMENT_WARN = "0.3";
-/** Рост коэффициента вариации после корректировок, при котором выдаётся предупреждение (п. п.). */
-export const DISPERSION_GROWTH_PP = "0.01";
-export const DISPERSION_MESSAGE = "После корректировок разброс цен увеличился. Проверьте выбор аналогов и применённые корректировки.";
+export { DISPERSION_GROWTH_PP, DISPERSION_MESSAGE } from "../calc/quality";
+
+/** JSON с отсортированными ключами — для сравнения структур независимо от порядка полей. */
+export function canonicalJson(v: unknown): string {
+  if (v === null || typeof v !== "object") return JSON.stringify(v);
+  if (Array.isArray(v)) return `[${v.map(canonicalJson).join(",")}]`;
+  const o = v as Record<string, unknown>;
+  return `{${Object.keys(o).filter((k) => o[k] !== undefined).sort().map((k) => `${JSON.stringify(k)}:${canonicalJson(o[k])}`).join(",")}}`;
+}
 
 const signOf = (v: string) => (d(v).isZero() ? 0 : d(v).isNeg() ? -1 : 1);
 
@@ -283,6 +290,10 @@ export function runChecks(s: AssessmentSnapshot, opts: CheckOptions = {}): Check
           issues.push({ code: "ADJ_VALUE_MISMATCH", severity: "error", section: "adjustments", message: `${name}: в расчёте у объекта «${adj.subjectValue}», а в карточке объекта — «${expS}». Обновите корректировки` });
         }
       }
+      const expl = (adj.ruleSnapshot as { explanation?: string } | null)?.explanation ?? "";
+      if (/^Ошибка формулы|не положителен/.test(expl) && !adj.overridden) {
+        issues.push({ code: "ADJ_FORMULA_ERROR", severity: "error", section: "adjustments", field: `adjustment.${adj.id}`, message: `${name}: ${expl} — исправьте формулу в справочнике или задайте значение вручную с обоснованием` });
+      }
       if (adj.minValue === null && adj.maxValue === null && d(adj.value).abs().gt(SINGLE_ADJUSTMENT_WARN)) {
         issues.push({ code: "ADJ_LARGE", severity: "warning", section: "adjustments", message: `${name}: корректировка ${fmtPercent(adj.value, 2, true)} превышает ${fmtPercent(SINGLE_ADJUSTMENT_WARN, 0)} по модулю — проверьте сопоставимость аналога` });
       }
@@ -305,6 +316,9 @@ export function runChecks(s: AssessmentSnapshot, opts: CheckOptions = {}): Check
         issues.push({ code: "ADJ_EDITION_MIXED", severity: "warning", section: "adjustments", message: `${name}: корректировка получена из другой редакции справочника (${rs.sourceCode} ${rs.edition}) — обновите предложения` });
       }
     }
+  }
+  if (!s.directory && included.length > 0) {
+    issues.push({ code: "NO_DIRECTORY", severity: "warning", section: "adjustments", message: "Справочник корректировок не выбран — корректировки не рассчитаны. Выберите справочник в разделе «Задание»" });
   }
   if (s.directory?.isDemo) {
     issues.push({ code: "DIRECTORY_DEMO", severity: "warning", section: "adjustments", message: `Используется демонстрационный справочник «${s.directory.name}» — значения не подтверждены источником, требуется проверка оценщиком` });
@@ -399,18 +413,17 @@ export function runChecks(s: AssessmentSnapshot, opts: CheckOptions = {}): Check
     if (p.area && !d(result.subjectArea).eq(round(p.area, 2))) {
       issues.push({ code: "AREA_CALC_MISMATCH", severity: "error", section: "calculation", message: "Площадь в расчёте не совпадает с площадью объекта" });
     }
-    // Разброс исходных и скорректированных цен
-    if (result.comparables.length >= 2) {
-      const rawStats = computeStats(result.comparables.map((c) => d(c.unitPrice)));
-      if (d(result.stats.cv).minus(rawStats.cv).gte(DISPERSION_GROWTH_PP)) {
-        issues.push({ code: "DISPERSION_GROWTH", severity: "warning", section: "calculation", message: `${DISPERSION_MESSAGE} Коэффициент вариации: до ${fmtPercent(rawStats.cv)}, после ${fmtPercent(result.stats.cv)}` });
-      }
+    // Разброс исходных и скорректированных цен (тот же расчёт, что в блоке «Контроль расчёта»)
+    const q = calcQuality(result);
+    if (q.dispersionGrew) {
+      issues.push({ code: "DISPERSION_GROWTH", severity: "warning", section: "calculation", message: `${DISPERSION_MESSAGE} Коэффициент вариации: до ${fmtPercent(q.cvBefore)}, после ${fmtPercent(q.cvAfter)}` });
     }
     for (const w of result.warnings) {
       issues.push({ code: "CALC_WARNING", severity: "warning", section: "calculation", message: w });
     }
     if (opts.storedResult) {
-      if (JSON.stringify(opts.storedResult) !== JSON.stringify(result)) {
+      // сравнение без учёта порядка ключей: JSONB в PostgreSQL переупорядочивает ключи объектов
+      if (canonicalJson(opts.storedResult) !== canonicalJson(result)) {
         issues.push({ code: "STORED_RESULT_MISMATCH", severity: "error", section: "calculation", message: "Сохранённый результат расчёта не совпадает с пересчётом по тем же данным — версия расчёта недостоверна" });
       }
     }

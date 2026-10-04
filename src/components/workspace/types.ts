@@ -104,7 +104,7 @@ export interface Detail {
   building: Record<string, unknown> & { provenance: Provenance };
   comparables: ComparableRow[];
   sources: Array<{ id: string; kind: string; title: string; retrievedAt: string; fileId: string | null; extracted: Record<string, unknown> | null; note: string | null }>;
-  calculation: { versions: Array<{ id: string; versionNumber: number; createdAt: string; inputHash: string; engineVersion: string; note: string | null; result: CalcResult }> } | null;
+  calculation: { versions: Array<{ id: string; versionNumber: number; createdAt: string; inputHash: string; engineVersion: string; note: string | null; result: CalcResult; createdByName: string | null }> } | null;
   reports: Array<{ id: string; format: string; fileId: string; createdAt: string; calculationVersion: { versionNumber: number }; checks: { errors: number; warnings: number } }>;
   files: Array<{ id: string; kind: string; filename: string; mime: string; size: number; caption: string | null; createdAt: string }>;
 }

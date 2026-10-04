@@ -12,6 +12,7 @@ import { buildChecklist } from "@/core/checks/catalog";
 import { suggestForComparable, type DirectoryEdition } from "@/core/adjustments/suggest";
 import type { AssessmentSnapshot, SnapshotAdjustment } from "@/core/snapshot";
 import type { InfrastructureSnapshot } from "@/core/infrastructure";
+import { BLOCKED_MESSAGE } from "@/core/calc/quality";
 import type { ObjectFeatures } from "@/core/adjustments/attributes";
 import { distanceM, toPoint } from "@/core/geo";
 import { d } from "@/core/calc/decimal";
@@ -89,18 +90,19 @@ export async function getDetail(id: string, userId: string) {
       // исходные данные поставщика в интерфейс не отдаются целиком — только нормализованный снимок
       comparables: { omit: { rawData: true }, orderBy: [{ position: "asc" }, { createdAt: "asc" }], include: { adjustments: { orderBy: [{ stage: "asc" }, { sortOrder: "asc" }] } } },
       sources: { orderBy: { createdAt: "desc" } },
-      calculation: { include: { versions: { orderBy: { versionNumber: "desc" }, select: { id: true, versionNumber: true, createdAt: true, inputHash: true, engineVersion: true, note: true, result: true } } } },
+      calculation: { include: { versions: { orderBy: { versionNumber: "desc" }, select: { id: true, versionNumber: true, createdAt: true, inputHash: true, engineVersion: true, note: true, result: true, createdById: true } } } },
       reports: { orderBy: { createdAt: "desc" }, include: { calculationVersion: { select: { versionNumber: true } } } },
       files: { select: { id: true, kind: true, filename: true, mime: true, size: true, caption: true, createdAt: true }, where: { kind: { not: "report" } }, orderBy: { createdAt: "asc" } },
     },
   });
   // кто изменял корректировки вручную
-  const ids = [...new Set(a.comparables.flatMap((c) => c.adjustments.map((x) => x.overriddenById)).filter((x): x is string => !!x))];
+  const ids = [...new Set([...a.comparables.flatMap((c) => c.adjustments.map((x) => x.overriddenById)), ...(a.calculation?.versions.map((v) => v.createdById) ?? [])].filter((x): x is string => !!x))];
   const users = ids.length ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, email: true, appraiser: { select: { fullName: true } } } }) : [];
   const names = new Map(users.map((u) => [u.id, u.appraiser?.fullName || u.email]));
   return {
     ...a,
     comparables: a.comparables.map((c) => ({ ...c, adjustments: c.adjustments.map((x) => ({ ...x, overriddenByName: x.overriddenById ? names.get(x.overriddenById) ?? null : null })) })),
+    calculation: a.calculation ? { ...a.calculation, versions: a.calculation.versions.map((v) => ({ ...v, createdByName: v.createdById ? names.get(v.createdById) ?? null : null })) } : null,
   };
 }
 
@@ -478,6 +480,8 @@ export async function evaluate(assessmentId: string): Promise<{ snapshot: Assess
 export async function commitVersion(assessmentId: string, userId: string, note?: string) {
   const { snapshot, checks, hash, latestVersion } = await evaluate(assessmentId);
   if (!checks.result) throw new HttpError(422, "Расчёт невозможен — устраните ошибки", checks.issues);
+  // критические ошибки блокируют подтверждение; предупреждения — нет
+  if (checks.errors > 0) throw new HttpError(422, BLOCKED_MESSAGE, checks.issues.filter((i) => i.severity === "error"));
   if (latestVersion && latestVersion.inputHash === hash) {
     return { version: await prisma.calculationVersion.findUniqueOrThrow({ where: { id: latestVersion.id } }), created: false, checks, snapshot };
   }
