@@ -1,12 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: { default: "Оценка.Про — рабочее место оценщика", template: "%s · Оценка.Про" },
   description: "Цифровое рабочее место оценщика недвижимости: от адреса до готового отчёта.",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Оценка.Про", statusBarStyle: "default" },
-  icons: { icon: "/icons/icon.svg", apple: "/icons/apple-touch-icon.png" },
+  icons: { icon: [{ url: "/icons/icon.svg", type: "image/svg+xml" }, { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }], apple: "/icons/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = { themeColor: "#1d4ed8", width: "device-width", initialScale: 1 };
