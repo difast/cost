@@ -72,7 +72,7 @@ export default async function Home() {
       <Header authed={authed} />
       <main id="main">
         <Hero authed={authed} />
-        <Problem />
+        <Problem authed={authed} />
         <Features />
         <HowItWorks />
         <Example />

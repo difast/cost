@@ -31,14 +31,14 @@ export function ProductTour() {
   const view = VIEWS.find((v) => v.key === active)!;
   return (
     <div>
-      <div className="mb-4 flex gap-1 overflow-x-auto" role="tablist" aria-label="Экраны рабочего места">
+      <div className="mb-5 flex gap-1 overflow-x-auto sm:justify-center" role="tablist" aria-label="Экраны рабочего места">
         {VIEWS.map((v) => (
           <button
             key={v.key}
             role="tab"
             aria-selected={active === v.key}
             onClick={() => setActive(v.key)}
-            className={`shrink-0 rounded-md px-3 py-1.5 text-[13px] transition ${active === v.key ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+            className={`shrink-0 rounded-md px-4 py-2 text-[14.5px] transition ${active === v.key ? "bg-brand text-white" : "text-slate-600 hover:bg-slate-100"}`}
           >
             {v.label}
           </button>

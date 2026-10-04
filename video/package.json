@@ -1,0 +1,20 @@
+{
+  "name": "ocenka-video",
+  "private": true,
+  "description": "Видео-обзор для первого экрана лендинга (Remotion)",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts ProductOverview ../public/landing/hero.mp4 --codec=h264 --crf=26",
+    "poster": "remotion still src/index.ts ProductOverview ../public/landing/hero-poster.jpg --frame=510 --image-format=jpeg --jpeg-quality=85"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.532",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "remotion": "^4.0.532"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -5,164 +5,148 @@ import { NORMATIVE_SEED } from "@/server/seed/normative";
 import { PLANS } from "@/lib/plans";
 import { EXAMPLE_INPUT, EXAMPLE_SUBJECT, exampleIssues, exampleResult } from "./data";
 import { ProductTour } from "./ProductTour";
+import { HeroVideo } from "./HeroVideo";
 
 const Eyebrow = ({ children }: { children: React.ReactNode }) => (
   <div className="mb-3 text-[12px] font-semibold uppercase tracking-[0.08em] text-brand">{children}</div>
 );
 const H2 = ({ children, id }: { children: React.ReactNode; id?: string }) => (
-  <h2 id={id} className="text-[26px] font-semibold leading-tight tracking-tight text-slate-900 sm:text-[32px]">{children}</h2>
+  <h2 id={id} className="text-[28px] font-bold leading-tight tracking-tight text-slate-900 sm:text-[38px]">{children}</h2>
 );
-const Lead = ({ children }: { children: React.ReactNode }) => <p className="mt-4 max-w-2xl text-[15.5px] leading-relaxed text-slate-600">{children}</p>;
+const Lead = ({ children }: { children: React.ReactNode }) => <p className="mt-5 max-w-2xl text-[17px] leading-relaxed text-slate-600">{children}</p>;
 const Section = ({ id, children, className = "", labelledBy }: { id?: string; children: React.ReactNode; className?: string; labelledBy?: string }) => (
   <section id={id} aria-labelledby={labelledBy} className={`scroll-mt-16 py-16 sm:py-24 ${className}`}>
-    <div className="mx-auto max-w-6xl px-5">{children}</div>
+    <div className="mx-auto max-w-7xl px-5">{children}</div>
   </section>
 );
 
-// ───────────────────────── 2–3. Первый экран и интерфейс
+// ───────────────────────── 2. Первый экран (с видео)
+
+const HERO_STRIP: Array<[string, string, string]> = [
+  ["Ранний доступ", "Регистрация и работа в сервисе сейчас бесплатны", "#pricing"],
+  ["Выписка ЕГРН", "XML-выписка заполняет карточку объекта", "#features"],
+  ["Проверки", "Ошибки видны до формирования отчёта", "#checks"],
+  ["Отчёт", "DOCX и PDF из данных этой же оценки", "#how"],
+];
 
 export function Hero({ authed }: { authed: boolean }) {
   return (
-    <section className="border-b border-slate-200 bg-gradient-to-b from-white to-slate-50/80 pt-14 sm:pt-20">
-      <div className="mx-auto max-w-6xl px-5">
-        <div className="max-w-3xl">
-          <h1 className="text-[32px] font-semibold leading-[1.15] tracking-tight text-slate-900 sm:text-[46px]">
-            Оценка недвижимости — в одном рабочем месте
-          </h1>
-          <p className="mt-5 max-w-2xl text-[16.5px] leading-relaxed text-slate-600 sm:text-[18px]">
-            Данные объекта, аналоги, корректировки, расчёт и отчёт — в одной оценке, а не в десятке таблиц и вкладок. Каждая цифра расчёта видна и проверяема.
+    <section className="bg-brand-deep text-white">
+      <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 pb-12 pt-12 sm:pt-16 lg:grid-cols-[minmax(0,11fr)_minmax(0,10fr)] lg:gap-14 lg:pb-16 lg:pt-20">
+        <div>
+          <span className="inline-flex rounded-full bg-white/15 px-3.5 py-1.5 text-[13.5px] text-white/95">Для оценщиков · квартиры, сравнительный подход</span>
+          <h1 className="mt-5 text-[34px] font-bold leading-[1.12] tracking-tight sm:text-[48px] lg:text-[54px]">Оценка недвижимости — в одном рабочем месте</h1>
+          <p className="mt-6 max-w-xl text-[17px] leading-relaxed text-white/90 sm:text-[19px]">
+            Собирайте <b className="font-semibold text-white">данные об объекте</b>, работайте с <b className="font-semibold text-white">аналогами</b>, рассчитывайте корректировки и формируйте <b className="font-semibold text-white">отчёт</b> — без десятков таблиц и вкладок.
           </p>
-          <div className="mt-7 flex flex-wrap items-center gap-3">
+          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
             {authed ? (
-              <Link href="/app" className="btn btn-primary px-5 py-2.5 text-[15px]">Открыть кабинет</Link>
+              <Link href="/app" className="btn bg-white px-6 py-3 text-[16px] font-semibold text-brand-deep hover:bg-blue-50">Открыть кабинет</Link>
             ) : (
               <>
-                <Link href="/register" className="btn btn-primary px-5 py-2.5 text-[15px]">Создать аккаунт</Link>
-                <Link href="/login" className="btn btn-secondary px-5 py-2.5 text-[15px]">Войти</Link>
+                <Link href="/register" className="btn bg-white px-6 py-3 text-[16px] font-semibold text-brand-deep hover:bg-blue-50">Создать аккаунт</Link>
+                <Link href="/login" className="text-[16px] font-medium text-white hover:underline">Войти →</Link>
               </>
             )}
           </div>
-          <p className="mt-4 text-[13px] text-slate-500">Для профессиональных оценщиков недвижимости · сейчас — квартиры, сравнительный подход</p>
+          <p className="mt-5 text-[14px] text-white/75">Для профессиональных оценщиков недвижимости</p>
         </div>
-        <div className="mt-12 pb-14 sm:mt-14 sm:pb-20">
-          <ProductTour />
-        </div>
+        <HeroVideo />
+      </div>
+      <div className="mx-auto max-w-7xl px-5">
+        <nav className="grid grid-cols-2 lg:grid-cols-4" aria-label="Коротко о сервисе">
+          {HERO_STRIP.map(([k, v, href], i) => (
+            <a key={k} href={href} className={`border-t px-4 py-4 transition hover:bg-white/10 sm:px-6 sm:py-5 ${i === 0 ? "border-white bg-white/10" : "border-white/30"}`}>
+              <div className="text-[12.5px] text-white/70">{k}</div>
+              <div className="mt-1.5 text-[14.5px] leading-snug text-white sm:text-[16px]">{v}</div>
+            </a>
+          ))}
+        </nav>
       </div>
     </section>
   );
 }
 
-// ───────────────────────── 4. Проблема
+// ───────────────────────── 3. Задача (две колонки)
 
-const ROUTINE: Array<[string, string, string]> = [
-  ["Данные объекта", "Выписка, сайты, справочники — и ручной перенос в таблицу", "XML-выписка ЕГРН заполняет карточку, у каждого поля сохраняется источник"],
-  ["Аналоги", "Поиск по площадкам, копирование ссылок и цен в Excel", "Аналог хранится вместе со ссылкой, датой получения и скриншотом; можно загрузить CSV"],
-  ["Характеристики", "Одни и те же значения в нескольких таблицах и в тексте отчёта", "Вводятся один раз и используются в расчёте и во всех разделах отчёта"],
-  ["Корректировки", "Формулы в Excel, коэффициенты из разных источников", "Предлагаются по выбранной редакции справочника, изменения — с обоснованием"],
-  ["Проверка", "Пересчёт вручную, сверка дат, номеров и площадей", "Автоматические проверки согласованности до формирования отчёта"],
-  ["Отчёт", "Сборка из нескольких документов и вставка таблиц", "DOCX и PDF по шаблону из данных этой же оценки"],
+const PAINS = [
+  "данные об объекте собираются из разных источников",
+  "аналоги ищутся и переносятся вручную",
+  "характеристики дублируются в нескольких таблицах",
+  "корректировки считаются в Excel",
+  "расчёт проверяется вручную",
+  "отчёт собирается из нескольких документов",
 ];
 
-export function Problem() {
+export function Problem({ authed }: { authed: boolean }) {
   return (
-    <Section id="about" labelledBy="about-h">
-      <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
-        <div>
-          <Eyebrow>Задача</Eyebrow>
-          <H2 id="about-h">Сколько времени уходит на одну оценку?</H2>
-          <Lead>
-            Сам расчёт сравнительным подходом занимает немного времени. Основное уходит на подготовку: собрать сведения, найти и перенести аналоги, свести всё в таблицы, перепроверить и оформить отчёт.
-          </Lead>
-          <p className="mt-6 border-l-2 border-brand pl-4 text-[15.5px] font-medium text-slate-800">Мы собираем этот процесс в одном рабочем месте.</p>
+    <Section id="about" labelledBy="about-h" className="bg-white">
+      <div className="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
+        <div className="relative order-2 lg:order-1">
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_24px_60px_-28px_rgba(15,23,42,.35)]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/landing/ui-comparables.jpg" alt="Таблица аналогов рядом с объектом оценки" width={2880} height={1800} loading="lazy" className="block h-auto w-full" />
+          </div>
+          <div className="absolute -bottom-8 right-2 w-[30%] min-w-[110px] overflow-hidden rounded-[18px] border-[5px] border-slate-900 bg-white shadow-xl sm:right-6">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/landing/ui-mobile.jpg" alt="Расчёт на телефоне" width={1170} height={2532} loading="lazy" className="block h-auto w-full" />
+          </div>
+          <span className="absolute -top-4 right-6 rounded-full bg-brand px-3.5 py-1.5 text-[13px] font-medium text-white shadow-md">Выписка ЕГРН · XML</span>
+          <span className="absolute -bottom-5 left-4 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800 shadow-md sm:flex">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#15803d" strokeWidth="2.2" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+            Ошибок: 0 · отчёт можно формировать
+          </span>
         </div>
-        <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white sm:hidden">
-          {ROUTINE.map(([stage, before, after]) => (
-            <li key={stage} className="px-4 py-4">
-              <div className="text-[15px] font-medium text-slate-900">{stage}</div>
-              <div className="mt-2 text-[13.5px] text-slate-500"><span className="text-[11.5px] uppercase tracking-wide text-slate-400">Обычно · </span>{before}</div>
-              <div className="mt-1.5 text-[13.5px] text-slate-800"><span className="text-[11.5px] uppercase tracking-wide text-brand">В сервисе · </span>{after}</div>
-            </li>
-          ))}
-        </ul>
-        <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white sm:block">
-          <table className="w-full text-left text-[14px]">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-[12px] uppercase tracking-wide text-slate-500">
-                <th scope="col" className="px-4 py-2.5 font-medium">Этап</th>
-                <th scope="col" className="px-4 py-2.5 font-medium">Обычно</th>
-                <th scope="col" className="px-4 py-2.5 font-medium text-brand">В рабочем месте</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ROUTINE.map(([stage, before, after]) => (
-                <tr key={stage} className="border-b border-slate-100 align-top last:border-0">
-                  <th scope="row" className="w-[22%] px-4 py-3 font-medium text-slate-900">{stage}</th>
-                  <td className="w-[36%] px-4 py-3 text-slate-500">{before}</td>
-                  <td className="px-4 py-3 text-slate-800">{after}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="order-1 lg:order-2">
+          <H2 id="about-h">Сколько времени уходит на <span className="text-brand">одну оценку</span>?</H2>
+          <p className="mt-5 text-[17px] leading-relaxed text-slate-600">Сам расчёт занимает немного времени. Основное уходит на подготовку:</p>
+          <ul className="mt-4 grid gap-x-6 gap-y-2.5 text-[16px] text-slate-700 sm:grid-cols-2">
+            {PAINS.map((p) => (
+              <li key={p} className="flex gap-2.5"><span className="mt-[10px] h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" aria-hidden="true" />{p}</li>
+            ))}
+          </ul>
+          <p className="mt-6 text-[17px] font-semibold text-slate-900">Мы собираем этот процесс в одном рабочем месте.</p>
+          <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3">
+            <Link href={authed ? "/app" : "/register"} className="btn btn-primary px-5 py-2.5 text-[15.5px]">{authed ? "Открыть кабинет" : "Создать аккаунт"}</Link>
+            <a href="#example" className="text-[15.5px] font-medium text-brand hover:underline">Пример расчёта →</a>
+          </div>
         </div>
       </div>
     </Section>
   );
 }
 
-// ───────────────────────── 5. Возможности
+// ───────────────────────── 4–5. Рабочее место и возможности
 
-const FEATURES: Array<{ title: string; lead: string; points: string[] }> = [
-  {
-    title: "Данные объекта",
-    lead: "Одна карточка вместо выписки, заметок и таблицы.",
-    points: ["Импорт XML-выписки ЕГРН: кадастровый номер, площадь, адрес, этаж, права", "Источник и дата у каждого поля", "Характеристики дома, фото и документы"],
-  },
-  {
-    title: "Аналоги",
-    lead: "Рыночные предложения рядом с объектом оценки.",
-    points: ["Ссылка, дата получения и скриншот у каждого аналога", "Отличия от объекта подсвечены", "Ручной ввод или импорт CSV"],
-  },
-  {
-    title: "Корректировки",
-    lead: "Не нужно переносить коэффициенты в Excel.",
-    points: ["Расчёт по выбранной редакции справочника", "Любое значение можно изменить — с обоснованием", "Собственные редакции справочника"],
-  },
-  {
-    title: "Расчёт",
-    lead: "Прозрачная цепочка без скрытых коэффициентов.",
-    points: ["Цена → корректировка 1 → … → скорректированная цена", "Веса с формулой, статистика выборки", "Версии расчёта сохраняются"],
-  },
-  {
-    title: "Проверки",
-    lead: "Несоответствия видны до того, как их увидит заказчик.",
-    points: ["Сверка с выпиской ЕГРН", "Даты, источники, сроки документов оценщика", "Итог = цена за м² × площадь"],
-  },
-  {
-    title: "Отчёт",
-    lead: "Документ собирается из той же оценки, а не вручную.",
-    points: ["DOCX для редактирования и PDF", "Таблицы аналогов, корректировок и расчёта", "Источники и приложения со скриншотами"],
-  },
+const Icon = ({ d }: { d: string }) => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>
+);
+
+const FEATURES: Array<{ title: string; text: string; icon: string }> = [
+  { title: "Данные объекта", text: "ЕГРН и характеристики объекта в одной карточке. У каждого поля — источник и дата.", icon: "M4 21V8l8-5 8 5v13M9 21v-6h6v6" },
+  { title: "Аналоги", text: "Хранение и сравнение аналогов: ссылка, дата и скриншот. Ручной ввод или импорт CSV.", icon: "M4 6h16M4 12h16M4 18h10" },
+  { title: "Корректировки", text: "Расчёт по выбранной редакции справочника. Изменение значения — только с обоснованием.", icon: "M5 4v16M12 4v16M19 4v16M3 9h4M10 15h4M17 7h4" },
+  { title: "Расчёт", text: "Прозрачная цепочка: цена → корректировки → веса → итог. Версии расчёта сохраняются.", icon: "M6 3h12v18H6zM9 7h6M9 11h2M13 11h2M9 15h2M13 15h2" },
+  { title: "Проверки", text: "Автоматический поиск несоответствий: кадастровый номер, площадь, даты, источники, формулы.", icon: "M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-4.5" },
+  { title: "Отчёт", text: "DOCX и PDF на основе выполненной оценки: таблицы, обоснования, источники, приложения.", icon: "M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6" },
 ];
 
 export function Features() {
   return (
     <Section id="features" labelledBy="features-h" className="border-t border-slate-200 bg-white">
-      <Eyebrow>Возможности</Eyebrow>
-      <H2 id="features-h">Всё, что нужно для оценки квартиры сравнительным подходом</H2>
-      <div className="mt-12 grid border-l border-t border-slate-200 sm:grid-cols-2 lg:grid-cols-3">
-        {FEATURES.map((f, i) => (
-          <article key={f.title} className="border-b border-r border-slate-200 p-6 sm:p-7">
-            <div className="font-mono text-[12px] text-slate-400">{String(i + 1).padStart(2, "0")}</div>
-            <h3 className="mt-2 text-[17px] font-semibold text-slate-900">{f.title}</h3>
-            <p className="mt-1.5 text-[14.5px] text-slate-600">{f.lead}</p>
-            <ul className="mt-4 space-y-2 text-[13.5px] text-slate-700">
-              {f.points.map((p) => (
-                <li key={p} className="flex gap-2.5">
-                  <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-brand" aria-hidden="true" />
-                  {p}
-                </li>
-              ))}
-            </ul>
+      <div className="mx-auto max-w-3xl text-center">
+        <H2 id="features-h">Рабочее место, а не набор таблиц</H2>
+        <p className="mx-auto mt-4 max-w-2xl text-[17px] leading-relaxed text-slate-600">Все этапы оценки квартиры сравнительным подходом — в одной оценке. Ниже реальные экраны сервиса.</p>
+      </div>
+      <div className="mx-auto mt-10 max-w-5xl">
+        <ProductTour />
+      </div>
+      <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {FEATURES.map((f) => (
+          <article key={f.title} className="rounded-xl bg-slate-50 p-6 ring-1 ring-slate-200/70">
+            <div className="text-brand"><Icon d={f.icon} /></div>
+            <h3 className="mt-4 text-[18px] font-semibold text-slate-900">{f.title}</h3>
+            <p className="mt-2 text-[15px] leading-relaxed text-slate-600">{f.text}</p>
           </article>
         ))}
       </div>
@@ -206,7 +190,7 @@ export function Example() {
   const r = exampleResult();
   const n = (v: string, dp = 0) => fmtNumber(v, dp);
   return (
-    <Section labelledBy="example-h" className="border-t border-slate-200 bg-white">
+    <Section id="example" labelledBy="example-h" className="border-t border-slate-200 bg-white">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <Eyebrow>Механизм</Eyebrow>
@@ -308,7 +292,7 @@ export function Example() {
 export function Checks() {
   const issues = exampleIssues();
   return (
-    <Section labelledBy="checks-h" className="border-t border-slate-200">
+    <Section id="checks" labelledBy="checks-h" className="border-t border-slate-200 bg-slate-50">
       <div className="grid items-start gap-10 lg:grid-cols-2 lg:gap-16">
         <div>
           <Eyebrow>Контроль</Eyebrow>
@@ -358,8 +342,8 @@ export function Normative({ authed }: { authed: boolean }) {
   const docs = found.slice(0, 4);
   return (
     <Section id="normative" labelledBy="normative-h" className="border-t border-slate-200 bg-white">
-      <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
-        <div>
+      <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-16">
+        <div className="lg:order-2">
           <Eyebrow>Нормативная база</Eyebrow>
           <H2 id="normative-h">Нормативная база всегда под рукой</H2>
           <Lead>135-ФЗ, федеральные стандарты оценки, законы о регистрации недвижимости и ипотеке — с поиском по названию, номеру и содержанию. Библиотека пополняется стандартами СРО и методическими материалами.</Lead>
@@ -370,7 +354,7 @@ export function Normative({ authed }: { authed: boolean }) {
           </ul>
           <Link href={authed ? "/app/normative" : "/register?next=/app/normative"} className="btn btn-secondary mt-8 px-4 py-2">Открыть нормативную базу</Link>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 sm:p-5" aria-label="Пример поиска по нормативной базе">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-[0_24px_60px_-30px_rgba(15,23,42,.3)] sm:p-6 lg:order-1" aria-label="Пример поиска по нормативной базе">
           <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-[14px]">
             <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="#64748b" strokeWidth="1.8" aria-hidden="true"><circle cx="9" cy="9" r="6" /><path d="M14 14l4 4" /></svg>
             <span className="text-slate-900">ФСО</span>
@@ -484,19 +468,19 @@ export function Faq() {
 
 export function FinalCta({ authed }: { authed: boolean }) {
   return (
-    <section className="bg-slate-900 py-16 sm:py-20">
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-5 lg:flex-row lg:items-center lg:justify-between">
+    <section className="bg-brand-deep py-16 sm:py-20">
+      <div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-[26px] font-semibold leading-tight tracking-tight text-white sm:text-[30px]">Проведите следующую оценку в одном рабочем месте</h2>
-          <p className="mt-3 text-[15.5px] text-slate-300">Создайте аккаунт и попробуйте рабочее место оценщика.</p>
+          <h2 className="text-[28px] font-bold leading-tight tracking-tight text-white sm:text-[36px]">Проведите следующую оценку в одном рабочем месте</h2>
+          <p className="mt-3 text-[17px] text-white/85">Создайте аккаунт и попробуйте рабочее место оценщика.</p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-3">
           {authed ? (
-            <Link href="/app" className="btn bg-white px-5 py-2.5 text-[15px] text-slate-900 hover:bg-slate-100">Открыть кабинет</Link>
+            <Link href="/app" className="btn bg-white px-6 py-3 text-[16px] font-semibold text-brand-deep hover:bg-blue-50">Открыть кабинет</Link>
           ) : (
             <>
-              <Link href="/register" className="btn bg-white px-5 py-2.5 text-[15px] text-slate-900 hover:bg-slate-100">Создать аккаунт</Link>
-              <Link href="/login" className="btn border border-slate-600 px-5 py-2.5 text-[15px] text-white hover:bg-slate-800">Войти</Link>
+              <Link href="/register" className="btn bg-white px-6 py-3 text-[16px] font-semibold text-brand-deep hover:bg-blue-50">Создать аккаунт</Link>
+              <Link href="/login" className="btn border border-white/50 px-6 py-3 text-[16px] text-white hover:bg-white/10">Войти</Link>
             </>
           )}
         </div>
