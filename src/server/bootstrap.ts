@@ -2,7 +2,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { DEMO_DIRECTORY, DEMO_FACTORS } from "./seed/directory";
-import { NORMATIVE_SEED } from "./seed/normative";
+import { NORMATIVE_SEED, NORMATIVE_SOURCE_URLS } from "./seed/normative";
 import { DEFAULT_TEMPLATE, DEFAULT_TEMPLATE_CODE } from "@/core/report/defaultTemplate";
 
 let done: Promise<void> | null = null;
@@ -74,7 +74,12 @@ async function seed() {
         adoptedAt: "adoptedAt" in n && n.adoptedAt ? new Date(n.adoptedAt) : null,
         summary: n.summary,
         tags: n.tags,
+        url: NORMATIVE_SOURCE_URLS[n.code] ?? null,
       })),
     });
+  }
+  // Ссылки на источники для уже созданных документов: заполняются, только если не заданы.
+  for (const [code, url] of Object.entries(NORMATIVE_SOURCE_URLS)) {
+    await prisma.normativeDocument.updateMany({ where: { code, url: null }, data: { url } });
   }
 }

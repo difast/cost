@@ -24,3 +24,19 @@ export const NORMATIVE_SEED = [
   { kind: "law", code: "218-ФЗ", title: "Федеральный закон от 13.07.2015 № 218-ФЗ «О государственной регистрации недвижимости»", issuer: "Российская Федерация", adoptedAt: "2015-07-13", summary: "ЕГРН, кадастровый учёт и регистрация прав.", tags: ["закон", "ЕГРН"] },
   { kind: "law", code: "102-ФЗ", title: "Федеральный закон от 16.07.1998 № 102-ФЗ «Об ипотеке (залоге недвижимости)»", issuer: "Российская Федерация", adoptedAt: "1998-07-16", summary: "Ипотека и оценка предмета ипотеки.", tags: ["закон", "ипотека"] },
 ];
+
+// Официальные страницы документов в КонсультантПлюс (открываются в новой вкладке).
+// Для ФСО I–VI — соответствующие разделы приказа Минэкономразвития России от 14.04.2022 № 200.
+export const NORMATIVE_SOURCE_URLS: Record<string, string> = {
+  "135-ФЗ": "https://www.consultant.ru/document/cons_doc_LAW_19586/",
+  "ФСО I": "https://www.consultant.ru/document/cons_doc_LAW_415358/75d46e20ecf3c84f4fa0bab4d9c654c00cdc9188/",
+  "ФСО II": "https://www.consultant.ru/document/cons_doc_LAW_415358/2ec6f63e908756cce61cd3b11ea65b742bcc70fb/",
+  "ФСО III": "https://www.consultant.ru/document/cons_doc_LAW_415358/b158a4a24b5b8654293faf5c43ea2c52acbbaaff/",
+  "ФСО IV": "https://www.consultant.ru/document/cons_doc_LAW_415358/20130176a4718f2ecb928eaeb034bd50cb2f396e/",
+  "ФСО V": "https://www.consultant.ru/document/cons_doc_LAW_415358/5facfdd258889bf70bf14c57879594c2876849d4/",
+  "ФСО VI": "https://www.consultant.ru/document/cons_doc_LAW_415358/436678a309dee407e6db518dfba37f1070398cb9/",
+  "ФСО № 7": "https://www.consultant.ru/document/cons_doc_LAW_160678/76df77d9a6013003f54d591e78864ebd67908f32/",
+  "ФСО № 9": "https://www.consultant.ru/document/cons_doc_LAW_180652/152b0e93c70e0a84672d2ce65ae595132b90d6b9/",
+  "218-ФЗ": "https://www.consultant.ru/document/cons_doc_LAW_182661/",
+  "102-ФЗ": "https://www.consultant.ru/document/cons_doc_LAW_19396/",
+};

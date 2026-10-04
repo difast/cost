@@ -80,12 +80,13 @@ export function NormativeLibrary() {
                       {open === d.id && d.summary && <p className="mt-2 max-w-3xl text-[13px] text-zinc-700">{d.summary}</p>}
                       {open === d.id && d.tags.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{d.tags.map((t) => <Badge key={t}>{t}</Badge>)}</div>}
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
                       <Badge tone={d.status === "active" ? "ok" : "neutral"}>{d.status === "active" ? "Действует" : d.status === "repealed" ? "Утратил силу" : "Проект"}</Badge>
-                      {d.url ? (
-                        <a href={d.url} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm"><Icon name="external" size={13} />Открыть</a>
-                      ) : (
-                        <button className="btn btn-secondary btn-sm" onClick={() => setOpen(open === d.id ? null : d.id)}>{open === d.id ? "Свернуть" : "Подробнее"}</button>
+                      {(d.summary || d.tags.length > 0) && (
+                        <button className="btn btn-ghost btn-sm" onClick={() => setOpen(open === d.id ? null : d.id)}>{open === d.id ? "Свернуть" : "Подробнее"}</button>
+                      )}
+                      {d.url && (
+                        <a href={d.url} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm" title="Открыть документ в КонсультантПлюс в новой вкладке"><Icon name="external" size={13} />Открыть источник</a>
                       )}
                     </div>
                   </div>
