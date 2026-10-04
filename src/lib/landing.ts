@@ -1,8 +1,9 @@
-// Видео первого экрана. Пока ролика нет — показывается заготовка (обложка и подпись «скоро»).
-// Когда ролик будет готов: положите файл в public/landing/hero.mp4 и укажите src: "/landing/hero.mp4".
-// Исходник видео — проект Remotion в папке /video.
-export const HERO_VIDEO: { src: string | null; poster: string; title: string } = {
-  src: null,
-  poster: "/landing/ui-adjustments.jpg",
-  title: "Обзор рабочего места оценщика",
+// Видео первого экрана: горизонтальная версия для компьютера и вертикальная для телефона.
+// Исходник — проект Remotion в папке /video (npm run render:desktop / render:mobile).
+export const HERO_VIDEO = {
+  src: "/landing/hero.mp4",
+  poster: "/landing/hero-poster.jpg",
+  srcMobile: "/landing/hero-mobile.mp4",
+  posterMobile: "/landing/hero-mobile-poster.jpg",
+  title: "ЭВМО — обзор рабочей системы для оценки недвижимости",
 };

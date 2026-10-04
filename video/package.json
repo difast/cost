@@ -1,11 +1,13 @@
 {
-  "name": "ocenka-video",
+  "name": "evmo-video",
   "private": true,
-  "description": "Видео-обзор для первого экрана лендинга (Remotion)",
+  "description": "Видео-обзор ЭВМО для лендинга (Remotion): горизонтальная и вертикальная версии",
   "scripts": {
     "studio": "remotion studio src/index.ts",
-    "render": "remotion render src/index.ts ProductOverview ../public/landing/hero.mp4 --codec=h264 --crf=26",
-    "poster": "remotion still src/index.ts ProductOverview ../public/landing/hero-poster.jpg --frame=510 --image-format=jpeg --jpeg-quality=85"
+    "music": "node music/lounge.mjs music/lounge.wav 47 && ffmpeg -y -loglevel error -i music/lounge.wav -af loudnorm=I=-18:TP=-1.5:LRA=11 -c:a libmp3lame -b:a 192k public/music.mp3 && rm music/lounge.wav",
+    "render:desktop": "remotion render src/index.ts Desktop out/hero.master.mp4 --codec=h264 --crf=23 --x264-preset=slow --audio-codec=aac && ffmpeg -y -loglevel error -i out/hero.master.mp4 -c:v libx264 -preset slow -crf 27 -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k ../public/landing/hero.mp4",
+    "render:mobile": "remotion render src/index.ts Mobile out/hero-mobile.master.mp4 --codec=h264 --crf=23 --x264-preset=slow --audio-codec=aac && ffmpeg -y -loglevel error -i out/hero-mobile.master.mp4 -c:v libx264 -preset slow -crf 27 -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k ../public/landing/hero-mobile.mp4",
+    "posters": "ffmpeg -y -loglevel error -ss 2 -i ../public/landing/hero.mp4 -frames:v 1 -q:v 3 ../public/landing/hero-poster.jpg && ffmpeg -y -loglevel error -ss 2 -i ../public/landing/hero-mobile.mp4 -frames:v 1 -q:v 3 ../public/landing/hero-mobile-poster.jpg"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.532",
