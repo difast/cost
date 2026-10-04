@@ -31,6 +31,27 @@ describe("отчёт", () => {
     expect([...cads].sort()).toEqual(["77:01:0001001:1000", "77:01:0001001:1234"]);
   });
 
+  it("координаты и инфраструктура попадают в раздел «Местоположение», если получены", async () => {
+    const c = ctx();
+    expect(JSON.stringify(buildReport(DEFAULT_TEMPLATE, c).blocks)).not.toContain("Ближайшая инфраструктура");
+    c.snapshot.property.latitude = "55.753083";
+    c.snapshot.property.longitude = "37.587614";
+    c.snapshot.property.infrastructure = {
+      provider: "yandex", providerTitle: "Яндекс Карты", retrievedAt: "2026-10-01T00:00:00Z", center: { lat: 55.753083, lon: 37.587614 },
+      categories: [
+        { key: "pharmacy", label: "Аптеки", status: "ok", radiusM: 1000, items: [{ name: "Аптека", type: "Аптека", address: "ул. Тестовая, 1", lat: 55.754, lon: 37.588, distanceM: 120 }] },
+        { key: "metro", label: "Метро", status: "empty", radiusM: 5000, items: [] },
+      ],
+    };
+    const doc = buildReport(DEFAULT_TEMPLATE, c);
+    const text = JSON.stringify(doc.blocks);
+    expect(text).toContain("55.753083, 37.587614");
+    expect(text).toContain("ул. Тестовая, 1");
+    expect(text).toContain("120 м");
+    expect(text).toContain("В радиусе 5,0 км не найдено");
+    expect((await renderDocx(doc)).subarray(0, 2).toString()).toBe("PK");
+  }, 30000);
+
   it("DOCX и PDF формируются", async () => {
     const doc = buildReport(DEFAULT_TEMPLATE, ctx());
     const docx = await renderDocx(doc);

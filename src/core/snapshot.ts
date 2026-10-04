@@ -3,6 +3,7 @@
 // воспроизводится на тех данных и коэффициентах, которые действовали тогда.
 
 import type { CalcSettings } from "./calc/types";
+import type { InfrastructureSnapshot } from "./infrastructure";
 
 export interface SnapshotAdjustment {
   id: string;
@@ -139,6 +140,10 @@ export interface AssessmentSnapshot {
     metroDistanceM: number | null;
     district: string | null;
     description: string | null;
+    /** Координаты и инфраструктура — только если получены (старые снимки их не содержат). */
+    latitude?: string;
+    longitude?: string;
+    infrastructure?: InfrastructureSnapshot;
     provenance: Record<string, unknown>;
   };
   building: {

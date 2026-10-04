@@ -83,6 +83,8 @@ export const propertySchema = z.object({
   rooms: int, floor: int, ceilingHeight: dec,
   finishing: str, condition: str, furniture: bool, balcony: str, bathroom: str, communications: str,
   metroName: str, metroDistanceM: int, district: str, description: longStr,
+  latitude: dec.refine((v) => v === null || Math.abs(Number(v)) <= 90, "Широта от −90 до 90"),
+  longitude: dec.refine((v) => v === null || Math.abs(Number(v)) <= 180, "Долгота от −180 до 180"),
 }).partial();
 
 export const buildingSchema = z.object({

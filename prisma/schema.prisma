@@ -168,6 +168,11 @@ model Property {
   metroDistanceM   Int?
   district         String?
   description      String?
+  /// Координаты объекта (WGS 84). Источник — в provenance (геокодер или ручной ввод).
+  latitude         Decimal?   @db.Decimal(9, 6)
+  longitude        Decimal?   @db.Decimal(9, 6)
+  /// Снимок ближайшей инфраструктуры, полученной из картографического сервиса (для отчёта).
+  infrastructure   Json?
   provenance       Json       @default("{}")
   updatedAt        DateTime   @updatedAt
 }

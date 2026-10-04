@@ -1,3 +1,4 @@
+import { yandexConfigured } from "./yandex";
 import type { ComparablesProvider, PropertyLookupQuery, PropertyLookupResult, PropertyProvider, ProviderInfo } from "./types";
 
 // Реестр адаптеров. Новый источник подключается добавлением адаптера сюда —
@@ -15,7 +16,7 @@ export const PLANNED_SOURCES: ProviderInfo[] = [
   { code: "gis_zhkh", name: "ГИС ЖКХ", access: "official_api", capabilities: ["building"], configured: false, note: "Требуется официальный канал доступа", usedFor: ["год постройки", "этажность", "материал стен", "капитальный ремонт"] },
   { code: "fias_gar", name: "ФИАС / ГАР", access: "official_api", capabilities: ["address"], configured: false, note: "Выгрузки ГАР ФНС или лицензированный сервис нормализации адресов", usedFor: ["нормализация адреса", "код ФИАС"] },
   { code: "listings_partner", name: "Площадки объявлений (ЦИАН, Авито, Домклик)", access: "partner_api", capabilities: ["comparables", "market"], configured: false, note: "Только по партнёрскому договору или через лицензированного поставщика", usedFor: ["автоматический подбор аналогов", "рыночная статистика"] },
-  { code: "maps", name: "Картографический сервис (инфраструктура, расстояния)", access: "partner_api", capabilities: ["infrastructure"], configured: false, note: "Коммерческий API по договору", usedFor: ["расстояния до метро, остановок, школ", "инфраструктура района"] },
+  { code: "maps", name: "Яндекс Карты: HTTP Геокодер и API Поиска по организациям", access: "official_api", capabilities: ["address", "infrastructure"], configured: false, note: "Ключ API задаётся в переменной окружения YANDEX_API_KEY", usedFor: ["координаты по адресу и адрес по координатам", "ближайшие школы, детские сады, медицина, аптеки, магазины, транспорт и метро", "расстояния до них (по прямой)"] },
   { code: "rosstat_cbr", name: "Росстат, Банк России", access: "official_api", capabilities: ["market"], configured: false, note: "Открытые данные; адаптер в версии 2", usedFor: ["макроэкономические показатели", "индексы цен на жильё"] },
 ];
 
@@ -41,7 +42,8 @@ export async function lookupProperty(q: PropertyLookupQuery): Promise<PropertyLo
 
 export function listSources(): ProviderInfo[] {
   const active = [...propertyProviders, ...comparablesProviders].map((p) => p.info);
-  return [...PLANNED_SOURCES.filter((s) => !active.some((a) => a.code === s.code)), ...active];
+  const planned = PLANNED_SOURCES.map((s) => (s.code === "maps" ? { ...s, configured: yandexConfigured() } : s));
+  return [...planned.filter((s) => !active.some((a) => a.code === s.code)), ...active];
 }
 
 export const comparableProviders = () => comparablesProviders.filter((p) => p.info.configured);

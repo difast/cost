@@ -8,6 +8,7 @@ import type { CheckReport } from "../checks";
 import { FINISHING, HOUSE_CONDITION, WALL_MATERIALS } from "../adjustments/attributes";
 import { amountInWords, fmtDate, fmtNumber, fmtPercent, fmtRub } from "../format";
 import type { AssessmentSnapshot } from "../snapshot";
+import { fmtDistance, type InfrastructureSnapshot } from "../infrastructure";
 import type { ReportBlock, ReportDoc, TemplateDefinition } from "./model";
 
 export interface ReportFile {
@@ -196,8 +197,10 @@ const BUILTINS: Record<string, Builtin> = {
           ["Район", dash(p.district)],
           ["Ближайшая станция метро", dash(p.metroName)],
           ["Расстояние до метро", p.metroDistanceM !== null ? `${fmtNumber(p.metroDistanceM, 0)} м` : "—"],
+          ...(p.latitude && p.longitude ? [["Координаты (широта, долгота)", `${p.latitude}, ${p.longitude}`] as [string, string]] : []),
         ],
       },
+      ...infrastructureBlocks(p.infrastructure),
     ];
   },
 
@@ -499,3 +502,18 @@ export function buildReport(def: TemplateDefinition, c: BuildContext): ReportDoc
 
 /** Сумма по итогу для контроля в тестах и UI. */
 export const valueOf = (c: BuildContext) => d(c.result.finalValue);
+
+/** Таблица ближайшей инфраструктуры для раздела «Местоположение и окружение». */
+function infrastructureBlocks(infra: InfrastructureSnapshot | undefined): ReportBlock[] {
+  if (!infra) return [];
+  const rows: string[][] = [];
+  for (const c of infra.categories) {
+    if (c.status === "ok") for (const i of c.items) rows.push([c.label, i.name, i.address ?? "—", fmtDistance(i.distanceM)]);
+    else rows.push([c.label, c.status === "empty" ? `В радиусе ${fmtDistance(c.radiusM)} не найдено` : "Данные не получены", "—", "—"]);
+  }
+  return [
+    { type: "paragraph", text: "Ближайшая инфраструктура:", bold: true },
+    { type: "table", header: ["Категория", "Наименование", "Адрес", "Расстояние"], rows, widths: [22, 30, 36, 12], small: true },
+    { type: "paragraph", text: `Источник: ${infra.providerTitle}, данные получены ${fmtDate(infra.retrievedAt)}. Расстояния указаны по прямой от объекта оценки.`, italic: true },
+  ];
+}

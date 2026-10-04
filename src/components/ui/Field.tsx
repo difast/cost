@@ -21,7 +21,7 @@ export function Field({ label, children, hint, className = "", source, required,
 export function SourceTag({ source, title, at }: { source?: string; title?: string; at?: string }) {
   if (!source) return null;
   const egrn = source.startsWith("egrn");
-  const label = egrn ? "ЕГРН" : source === "manual" ? "Вручную" : source;
+  const label = egrn ? "ЕГРН" : source === "manual" ? "Вручную" : source === "yandex" ? "Яндекс" : source;
   return (
     <span className="group relative inline-flex">
       <span

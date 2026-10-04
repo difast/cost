@@ -8,11 +8,13 @@ import { Icon } from "@/components/ui/Icon";
 import { ConfirmModal, Notice, Panel, toast } from "@/components/ui/kit";
 import { CONDITION_OPTIONS, FINISHING_OPTIONS, WALL_OPTIONS } from "@/lib/labels";
 import { fmtDate } from "@/core/format";
+import type { InfrastructureSnapshot } from "@/core/infrastructure";
 import { NextStep, StepIssues } from "./common";
+import { InfrastructurePanel, mapUrl } from "./InfrastructurePanel";
 import type { WsProps } from "./Workspace";
 import type { Provenance } from "./types";
 
-const P_KEYS = ["objectType", "address", "cadastralNumber", "area", "livingArea", "kitchenArea", "purpose", "rights", "rightHolders", "encumbrances", "rooms", "floor", "ceilingHeight", "finishing", "condition", "furniture", "balcony", "bathroom", "communications", "metroName", "metroDistanceM", "district", "description"] as const;
+const P_KEYS = ["objectType", "address", "cadastralNumber", "area", "livingArea", "kitchenArea", "purpose", "rights", "rightHolders", "encumbrances", "rooms", "floor", "ceilingHeight", "finishing", "condition", "furniture", "balcony", "bathroom", "communications", "metroName", "metroDistanceM", "district", "description", "latitude", "longitude"] as const;
 const B_KEYS = ["cadastralNumber", "yearBuilt", "floors", "wallMaterial", "series", "houseCondition", "elevators", "parking", "overhaulYear", "description"] as const;
 
 const pick = (o: Record<string, unknown>, keys: readonly string[]) => Object.fromEntries(keys.map((k) => [k, o[k] ?? null]));
@@ -24,6 +26,8 @@ export function PropertyTab({ detail, reload, checklist, go }: WsProps) {
   const [error, setError] = useState<string | null>(null);
   const [egrn, setEgrn] = useState<{ tone: "ok" | "err" | "info"; text: string } | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [geoBusy, setGeoBusy] = useState<"geocode" | "reverse" | "infra" | null>(null);
+  const [geoMsg, setGeoMsg] = useState<{ tone: "ok" | "err" | "info"; text: string; address?: string } | null>(null);
   const egrnRef = useRef<HTMLInputElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
   const docRef = useRef<HTMLInputElement>(null);
@@ -32,20 +36,50 @@ export function PropertyTab({ detail, reload, checklist, go }: WsProps) {
   const P = prop.draft, sP = prop.set, B = bld.draft, sB = bld.set;
   const src = (prov: Provenance, k: string) => <SourceTag source={prov?.[k]?.source} title={prov?.[k]?.title} at={prov?.[k]?.at} />;
 
+  const persist = () =>
+    api.put(`/api/assessments/${detail.id}/property`, {
+      ...(prop.dirty ? { property: prop.changes } : {}),
+      ...(bld.dirty ? { building: bld.changes } : {}),
+    });
+
   async function save() {
     setBusy(true);
     setError(null);
     try {
-      await api.put(`/api/assessments/${detail.id}/property`, {
-        ...(prop.dirty ? { property: prop.changes } : {}),
-        ...(bld.dirty ? { building: bld.changes } : {}),
-      });
+      await persist();
       toast("Данные объекта сохранены");
       await reload();
     } catch (e) {
       setError(errorText(e));
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** Действия с картографическим сервисом. Несохранённые правки сначала сохраняются,
+   *  чтобы координаты и инфраструктура соответствовали сохранённому адресу. */
+  async function locate(action: "geocode" | "reverse" | "infra") {
+    setGeoBusy(action);
+    setGeoMsg(null);
+    try {
+      if (action === "reverse") {
+        const r = await api.post<{ address: string }>(`/api/assessments/${detail.id}/location`, { action: "reverse", lat: P.latitude, lon: P.longitude });
+        setGeoMsg({ tone: "info", text: `По координатам найден адрес: ${r.address}`, address: r.address });
+        return;
+      }
+      if (prop.dirty || bld.dirty) await persist();
+      if (action === "geocode") {
+        const r = await api.post<{ lat: number; lon: number; formatted: string; precisionLabel: string }>(`/api/assessments/${detail.id}/location`, { action: "geocode", address: P.address });
+        setGeoMsg({ tone: "ok", text: `Координаты определены: ${r.lat.toFixed(6)}, ${r.lon.toFixed(6)} — «${r.formatted}» (${r.precisionLabel}).` });
+      } else {
+        await api.post(`/api/assessments/${detail.id}/location`, { action: "infrastructure" });
+        toast("Инфраструктура получена и сохранена в оценке");
+      }
+      await reload();
+    } catch (e) {
+      setGeoMsg({ tone: "err", text: errorText(e) });
+    } finally {
+      setGeoBusy(null);
     }
   }
 
@@ -154,12 +188,39 @@ export function PropertyTab({ detail, reload, checklist, go }: WsProps) {
             <Panel title="Местоположение">
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                 <Field label="Район"><TextInput d={P} k="district" set={sP} /></Field>
-                <Field label="Ближайшее метро"><TextInput d={P} k="metroName" set={sP} /></Field>
-                <Field label="Расстояние до метро" hint="Используется в корректировке на транспортную доступность"><NumInput d={P} k="metroDistanceM" set={sP} suffix="м" /></Field>
+                <Field label="Ближайшее метро" source={src(pv, "metroName")}><TextInput d={P} k="metroName" set={sP} /></Field>
+                <Field label="Расстояние до метро" hint="Используется в корректировке на транспортную доступность" source={src(pv, "metroDistanceM")}><NumInput d={P} k="metroDistanceM" set={sP} suffix="м" /></Field>
+                <Field label="Широта" source={src(pv, "latitude")}><NumInput d={P} k="latitude" set={sP} placeholder="55.753083" /></Field>
+                <Field label="Долгота" source={src(pv, "longitude")}><NumInput d={P} k="longitude" set={sP} placeholder="37.587614" /></Field>
               </div>
-              <p className="mt-3 text-[12px] text-muted">Расстояния вводятся вручную. Автоматический расчёт по карте появится после подключения картографического сервиса.</p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button className="btn btn-secondary btn-sm" onClick={() => locate("geocode")} disabled={!!geoBusy || !String(P.address ?? "").trim()} title="Яндекс Геокодер: адрес → координаты">
+                  <Icon name="map" size={14} />{geoBusy === "geocode" ? "Определяем…" : "Координаты по адресу"}
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => locate("reverse")} disabled={!!geoBusy || P.latitude == null || P.latitude === "" || P.longitude == null || P.longitude === ""} title="Яндекс Геокодер: координаты → адрес">
+                  {geoBusy === "reverse" ? "Ищем адрес…" : "Адрес по координатам"}
+                </button>
+                {detail.property.latitude != null && detail.property.longitude != null && (
+                  <a href={mapUrl(Number(detail.property.latitude), Number(detail.property.longitude))} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm"><Icon name="external" size={13} />На карте</a>
+                )}
+              </div>
+              {geoMsg && (
+                <Notice tone={geoMsg.tone} className="mt-3" action={geoMsg.address && geoMsg.address !== P.address ? <button className="btn btn-secondary btn-sm" onClick={() => { sP("address", geoMsg.address); setGeoMsg(null); }}>Подставить</button> : undefined}>
+                  {geoMsg.text}
+                </Notice>
+              )}
+              <p className="mt-3 text-[12px] text-muted">Координаты определяются Яндекс Геокодером по адресу или вводятся вручную. Район и расстояние до метро можно скорректировать вручную.</p>
             </Panel>
           </div>
+
+          <InfrastructurePanel
+            infra={(detail.property.infrastructure as InfrastructureSnapshot | null) ?? null}
+            lat={detail.property.latitude}
+            lon={detail.property.longitude}
+            busy={geoBusy === "infra"}
+            onSearch={() => locate("infra")}
+            onUseMetro={(name, m) => { sP("metroName", name.replace(/^метро\s+/i, "")); sP("metroDistanceM", m); toast("Метро подставлено в карточку — сохраните изменения"); }}
+          />
         </div>
 
         <div className="space-y-4">

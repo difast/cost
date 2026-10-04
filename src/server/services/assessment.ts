@@ -11,6 +11,7 @@ import { runChecks, type CheckReport } from "@/core/checks";
 import { buildChecklist } from "@/core/checks/catalog";
 import { suggestForComparable, type DirectoryEdition } from "@/core/adjustments/suggest";
 import type { AssessmentSnapshot } from "@/core/snapshot";
+import type { InfrastructureSnapshot } from "@/core/infrastructure";
 import { d } from "@/core/calc/decimal";
 
 const iso = (v: Date | null | undefined) => (v ? v.toISOString() : null);
@@ -272,6 +273,8 @@ export async function buildSnapshot(assessmentId: string): Promise<AssessmentSna
       metroDistanceM: p?.metroDistanceM ?? null,
       district: p?.district ?? null,
       description: p?.description ?? null,
+      ...(p?.latitude != null && p?.longitude != null ? { latitude: decStr(p.latitude)!, longitude: decStr(p.longitude)! } : {}),
+      ...(p?.infrastructure ? { infrastructure: p.infrastructure as unknown as InfrastructureSnapshot } : {}),
       provenance: (p?.provenance ?? {}) as Record<string, unknown>,
     },
     building: {
