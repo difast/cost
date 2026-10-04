@@ -24,7 +24,7 @@ export function PageHeader({ title, description, actions, eyebrow }: { title: Re
 
 export function Panel({ title, description, actions, children, className = "", bodyClassName = "p-4", id }: { title?: ReactNode; description?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; bodyClassName?: string; id?: string }) {
   return (
-    <section id={id} className={`card ${className}`}>
+    <section id={id} className={`card min-w-0 ${className}`}>
       {(title || actions) && (
         <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-line px-4 py-3">
           <div className="min-w-0">

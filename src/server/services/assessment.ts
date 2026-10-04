@@ -4,6 +4,7 @@ import { HttpError, notFound } from "../http";
 import { diffObjects, logEvent } from "../audit";
 import { ensureSystemData } from "../bootstrap";
 import { stableStringify, sha256 } from "../stable";
+import { calcDefaultsFor, readUserSettings } from "../userSettings";
 import { DEFAULT_SETTINGS, type CalcResult, type CalcSettings } from "@/core/calc/types";
 import { ENGINE_VERSION } from "@/core/calc/engine";
 import { runChecks, type CheckReport } from "@/core/checks";
@@ -36,10 +37,18 @@ export async function createAssessment(userId: string, input: { address?: string
     if (CADASTRAL_INPUT_RE.test(input.query.trim())) cadastralNumber = input.query.trim();
     else address = input.query.trim();
   }
-  const directory = await prisma.adjustmentSource.findFirst({
-    where: { isActive: true, segment: "apartment", OR: [{ ownerId: userId }, { ownerId: null }] },
-    orderBy: [{ isDemo: "asc" }, { createdAt: "desc" }],
-  });
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { settings: true } });
+  const prefs = readUserSettings(user.settings);
+  // Справочник: выбранный в настройках, иначе — последний активный (не демонстрационный в приоритете)
+  const preferred = prefs.defaultAdjustmentSourceId
+    ? await prisma.adjustmentSource.findFirst({ where: { id: prefs.defaultAdjustmentSourceId, isActive: true, OR: [{ ownerId: userId }, { ownerId: null }] } })
+    : null;
+  const directory =
+    preferred ??
+    (await prisma.adjustmentSource.findFirst({
+      where: { isActive: true, segment: "apartment", OR: [{ ownerId: userId }, { ownerId: null }] },
+      orderBy: [{ isDemo: "asc" }, { createdAt: "desc" }],
+    }));
   const today = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00.000Z");
   const a = await prisma.assessment.create({
     data: {
@@ -59,7 +68,7 @@ export async function createAssessment(userId: string, input: { address?: string
         },
       },
       building: { create: {} },
-      calculation: { create: { settings: DEFAULT_SETTINGS as unknown as Prisma.InputJsonValue } },
+      calculation: { create: { settings: calcDefaultsFor(prefs) as unknown as Prisma.InputJsonValue } },
     },
   });
   await logEvent({ assessmentId: a.id, userId, action: "create", entity: "assessment", entityId: a.id, summary: `Создана оценка № ${a.number}` });

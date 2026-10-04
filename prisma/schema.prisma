@@ -22,6 +22,8 @@ model User {
   name           String?
   role           String        @default("appraiser") // appraiser | admin
   plan           String        @default("trial")     // trial | basic | pro | team | corporate
+  /// Системные настройки пользователя: умолчания для новых оценок и пороги контроля.
+  settings       Json          @default("{}")
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id])
   appraiser      Appraiser?

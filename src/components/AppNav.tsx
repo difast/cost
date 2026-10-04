@@ -56,6 +56,14 @@ export function AppNav({ name, email, docWarnings, activeCount }: { name: string
         <Link href="/app?new=1" className="mt-1 flex items-center gap-2.5 rounded-md px-2.5 py-1.5 pl-[22px] text-[13px] text-white/60 hover:bg-white/[.05] hover:text-white">
           <Icon name="plus" size={15} /> Новая оценка
         </Link>
+        <Link
+          href="/app/analytics"
+          className={`mt-1 flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[14px] font-medium transition ${path.startsWith("/app/analytics") ? "bg-white/[.09] text-white" : "text-white/80 hover:bg-white/[.05] hover:text-white"}`}
+        >
+          <span className={`h-4 w-[3px] rounded-full ${path.startsWith("/app/analytics") ? "bg-[#3fae7d]" : "bg-transparent"}`} />
+          <Icon name="chart" size={17} />
+          Аналитика
+        </Link>
       </div>
       <div className="mt-5 px-3">
         <div className="px-2.5 pb-1.5 text-[11px] font-medium uppercase tracking-[0.06em] text-white/35">Справочная информация</div>
@@ -75,7 +83,15 @@ export function AppNav({ name, email, docWarnings, activeCount }: { name: string
           })}
         </nav>
       </div>
-      <div className="mt-auto border-t border-white/10 p-3">
+      <div className="mt-auto px-3 pb-2">
+        <Link
+          href="/app/settings"
+          className={`flex items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[13px] transition ${path.startsWith("/app/settings") ? "bg-white/[.09] text-white" : "text-white/65 hover:bg-white/[.05] hover:text-white"}`}
+        >
+          <Icon name="settings" size={15} />Настройки
+        </Link>
+      </div>
+      <div className="border-t border-white/10 p-3">
         <div className="flex items-center gap-2.5 px-1">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-[12px] font-semibold text-white">{initials || "—"}</span>
           <div className="min-w-0 flex-1">
