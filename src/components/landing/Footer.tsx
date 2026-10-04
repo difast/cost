@@ -40,7 +40,7 @@ export function Footer() {
       </div>
       <div className="border-t border-zinc-200">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-5 text-[12px] text-zinc-400 sm:flex-row sm:justify-between">
-          <span>© {year} Оценка.Про · {COMPANY.name}, ОГРН {COMPANY.ogrn}, ИНН {COMPANY.inn}, {COMPANY.address}</span>
+          <span>© {year} ЭВМО — бренд сервиса. Сервис предоставляет {COMPANY.name}, ОГРН {COMPANY.ogrn}, ИНН {COMPANY.inn}, {COMPANY.address}</span>
           <span className="sm:text-right">Сервис не заменяет профессиональное суждение и ответственность оценщика.</span>
         </div>
       </div>

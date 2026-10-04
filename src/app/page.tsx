@@ -9,7 +9,7 @@ import { COMPANY } from "@/lib/company";
 
 export const dynamic = "force-dynamic";
 
-const TITLE = "Оценка.Про — сервис для оценщиков недвижимости: оценка квартиры, аналоги, корректировки, отчёт";
+const TITLE = "ЭВМО — сервис для оценщиков недвижимости: оценка квартиры, аналоги, корректировки, отчёт";
 const DESCRIPTION =
   "Рабочее место оценщика недвижимости: выписка ЕГРН, аналоги, расчёт корректировок сравнительным подходом, автоматические проверки и отчёт оценщика в DOCX и PDF.";
 
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     siteName: SITE_NAME,
     title: "Оценка недвижимости — в одном рабочем месте",
     description: DESCRIPTION,
-    images: [{ url: "/og.png", width: 1200, height: 630, alt: "Рабочее место оценщика Оценка.Про" }],
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "ЭВМО — рабочая система для оценки недвижимости" }],
   },
   twitter: { card: "summary_large_image", title: "Оценка недвижимости — в одном рабочем месте", description: DESCRIPTION, images: ["/og.png"] },
 };

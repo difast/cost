@@ -29,7 +29,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
       <form onSubmit={submit} className="card w-full max-w-sm space-y-4 p-7 shadow-[0_12px_40px_-20px_rgba(17,19,18,.25)]">
         <div>
-          <Link href="/" className="text-xs font-semibold uppercase tracking-wider text-brand">Оценка.Про</Link>
+          <Link href="/" className="text-xs font-semibold uppercase tracking-wider text-brand">ЭВМО</Link>
           <h1 className="mt-1 text-xl font-semibold">{mode === "login" ? "Вход" : "Регистрация оценщика"}</h1>
         </div>
         {mode === "register" && (

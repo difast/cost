@@ -40,7 +40,7 @@ const Intro = () => {
   return (
     <AbsoluteFill style={{ background: BRAND, justifyContent: "center", padding: "0 180px", opacity: out }}>
       <div style={{ display: "flex", alignItems: "center", gap: 20, color: "#fff", fontSize: 40, fontWeight: 700, opacity: s }}>
-        <Logo /> Оценка.Про
+        <Logo /> ЭВМО
       </div>
       <div style={{ marginTop: 48, color: "#fff", fontSize: 88, fontWeight: 700, lineHeight: 1.1, maxWidth: 1300, transform: `translateY(${(1 - s) * 30}px)`, opacity: s }}>
         Оценка недвижимости — в одном рабочем месте

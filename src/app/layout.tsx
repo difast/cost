@@ -5,10 +5,10 @@ import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: "Оценка.Про — рабочее место оценщика", template: "%s · Оценка.Про" },
-  description: "Цифровое рабочее место оценщика недвижимости: от адреса до готового отчёта.",
+  title: { default: "ЭВМО — рабочая система для оценки недвижимости", template: "%s · ЭВМО" },
+  description: "ЭВМО — рабочая система для оценки недвижимости: от адреса до готового отчёта.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "Оценка.Про", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "ЭВМО", statusBarStyle: "default" },
   icons: { icon: [{ url: "/icons/icon.svg", type: "image/svg+xml" }, { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }], apple: "/icons/apple-touch-icon.png" },
 };
 

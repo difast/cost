@@ -9,7 +9,7 @@ const VIEWS = [
   { key: "calculation", label: "Расчёт", src: "/landing/ui-calculation.jpg", caption: "Цепочка расчёта, веса и статистика выборки" },
 ] as const;
 
-export function BrowserFrame({ children, url = "ocenka.pro/app" }: { children: React.ReactNode; url?: string }) {
+export function BrowserFrame({ children, url = "evmo.ru/app" }: { children: React.ReactNode; url?: string }) {
   return (
     <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04),0_12px_40px_-12px_rgba(15,23,42,.18)]">
       <div className="flex h-9 items-center gap-3 border-b border-zinc-200 bg-zinc-50 px-3.5" aria-hidden="true">
@@ -44,7 +44,7 @@ export function ProductTour() {
           </button>
         ))}
       </div>
-      <BrowserFrame url="ocenka.pro/app/assessments/2026-001">
+      <BrowserFrame url="evmo.ru/app/assessments/2026-001">
         <div className="max-h-[440px] overflow-hidden sm:max-h-none">
         {VIEWS.map((v) => (
           // eslint-disable-next-line @next/next/no-img-element

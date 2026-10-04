@@ -26,7 +26,7 @@ function header(ws: ExcelJS.Worksheet, cols: Array<{ header: string; key: string
 
 export async function renderXlsx(s: AssessmentSnapshot, r: CalcResult, meta: { versionNumber: number; createdAt: string; createdBy: string | null }): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "Оценка.Про";
+  wb.creator = "ЭВМО";
   wb.created = new Date(meta.createdAt);
   const inCalc = r.comparables.map((rc) => s.comparables.find((c) => c.id === rc.id)!).filter(Boolean);
 

@@ -21,7 +21,7 @@ function Logo() {
         <rect width="512" height="512" rx="96" fill="#176b4d" />
         <path d="M128 300 256 168l128 132v108H292v-80h-72v80h-92z" fill="#fff" />
       </svg>
-      Оценка.Про
+      ЭВМО
     </Link>
   );
 }

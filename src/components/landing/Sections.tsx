@@ -34,7 +34,7 @@ export function Hero({ authed }: { authed: boolean }) {
     <section className="bg-brand-deep text-white">
       <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 pb-12 pt-12 sm:pt-16 lg:grid-cols-[minmax(0,11fr)_minmax(0,10fr)] lg:gap-14 lg:pb-16 lg:pt-20">
         <div>
-          <span className="inline-flex rounded-full border border-white/15 bg-white/5 px-3.5 py-1.5 text-[13.5px] text-white/90">Для оценщиков · квартиры, сравнительный подход</span>
+          <span className="inline-flex rounded-full border border-white/15 bg-white/5 px-3.5 py-1.5 text-[13.5px] text-white/90">ЭВМО — рабочая система для оценки недвижимости</span>
           <h1 className="mt-5 text-[34px] font-bold leading-[1.12] tracking-tight sm:text-[48px] lg:text-[54px]">Оценка недвижимости — в одном рабочем месте</h1>
           <p className="mt-6 max-w-xl text-[17px] leading-relaxed text-white/90 sm:text-[19px]">
             Собирайте <b className="font-semibold text-white">данные об объекте</b>, работайте с <b className="font-semibold text-white">аналогами</b>, рассчитывайте корректировки и формируйте <b className="font-semibold text-white">отчёт</b> — без десятков таблиц и вкладок.
