@@ -28,7 +28,7 @@ export function ChecksTab({ calc, go }: WsProps) {
         {issues.length === 0 ? (
           <div className="p-8 text-center text-ok">Замечаний нет. Данные согласованы.</div>
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-zinc-100">
             {issues.map((i, k) => (
               <li key={k} className="flex items-start gap-3 px-4 py-2.5">
                 <span className={`badge mt-0.5 shrink-0 ${i.severity === "error" ? "bg-red-50 text-err" : "bg-amber-50 text-warn"}`}>{i.severity === "error" ? "Ошибка" : "Внимание"}</span>

@@ -56,7 +56,7 @@ function Editor({ adj, label, assessmentId, onClose, onSaved }: { adj: Adjustmen
         <div><div className="label">Диапазон</div><span className="num">{adj.minValue !== null || adj.maxValue !== null ? `${adj.minValue !== null ? fmtPercent(adj.minValue) : "−∞"} … ${adj.maxValue !== null ? fmtPercent(adj.maxValue) : "+∞"}` : "—"}</span></div>
       </div>
       {adj.ruleSnapshot?.explanation && (
-        <div className="mt-2 rounded bg-slate-50 px-3 py-2 text-xs text-muted">
+        <div className="mt-2 rounded bg-zinc-50 px-3 py-2 text-xs text-muted">
           Расчёт: <span className="num">{adj.ruleSnapshot.explanation}</span> · {adj.ruleSnapshot.sourceName}, ред. {adj.ruleSnapshot.edition}
         </div>
       )}
@@ -142,12 +142,12 @@ export function AdjustmentsTab({ detail, reload, calc, go }: WsProps) {
               </tr>
             </thead>
             <tbody>
-              <tr className="bg-slate-50/60">
+              <tr className="bg-zinc-50/60">
                 <td className="text-muted">Цена предложения за м², ₽</td>
                 {comps.map((c) => <td key={c.id} className="num text-right">{res[c.id] ? fmtNumber(res[c.id].unitPrice) : "—"}</td>)}
               </tr>
               {factors.map((f, fi) => (
-                <tr key={f.code} className={fi > 0 && factors[fi - 1].stage !== f.stage ? "border-t-2 border-slate-200" : ""}>
+                <tr key={f.code} className={fi > 0 && factors[fi - 1].stage !== f.stage ? "border-t-2 border-zinc-200" : ""}>
                   <td>
                     <div>{f.name}</div>
                     <div className="text-[11px] text-muted">{f.stage === 1 ? "1-я группа" : "2-я группа"}</div>
@@ -159,20 +159,20 @@ export function AdjustmentsTab({ detail, reload, calc, go }: WsProps) {
                     const zero = d(a.value).isZero();
                     const missing = a.suggestedValue === null && !a.overridden;
                     return (
-                      <td key={c.id} className="cursor-pointer text-right hover:bg-blue-50" onClick={() => setSelected({ adj: a, label: `Аналог ${detail.comparables.indexOf(c) + 1}` })}>
+                      <td key={c.id} className="cursor-pointer text-right hover:bg-brand-soft" onClick={() => setSelected({ adj: a, label: `Аналог ${detail.comparables.indexOf(c) + 1}` })}>
                         <div className={`num font-medium ${zero ? "text-muted" : d(a.value).isNeg() ? "text-err" : "text-ok"}`}>
                           {fmtPercent(a.value, 2, true)}
-                          {a.overridden && <span title={a.comment ?? ""} className={`ml-1 badge ${a.comment ? "bg-blue-50 text-brand" : "bg-red-50 text-err"}`}>{a.comment ? "изм." : "нет обосн."}</span>}
+                          {a.overridden && <span title={a.comment ?? ""} className={`ml-1 badge ${a.comment ? "bg-brand-soft text-brand" : "bg-red-50 text-err"}`}>{a.comment ? "изм." : "нет обосн."}</span>}
                           {missing && <span className="ml-1 badge bg-amber-50 text-warn">нет данных</span>}
                         </div>
                         <div className="truncate text-[11px] text-muted">{a.comparableValue}</div>
-                        {step && <div className="num text-[11px] text-slate-500">→ {fmtNumber(step.after)}</div>}
+                        {step && <div className="num text-[11px] text-zinc-500">→ {fmtNumber(step.after)}</div>}
                       </td>
                     );
                   })}
                 </tr>
               ))}
-              <tr className="border-t-2 border-slate-300 font-semibold">
+              <tr className="border-t-2 border-zinc-300 font-semibold">
                 <td>Скорректированная цена за м², ₽</td>
                 {comps.map((c) => <td key={c.id} className="num text-right">{res[c.id] ? fmtNumber(res[c.id].adjustedUnitPrice) : "—"}</td>)}
               </tr>

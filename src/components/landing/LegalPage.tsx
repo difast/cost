@@ -6,12 +6,12 @@ import { COMPANY } from "@/lib/company";
 export async function LegalPage({ title, children }: { title: string; children: React.ReactNode }) {
   const authed = !!(await currentUser().catch(() => null));
   return (
-    <div className="bg-slate-50">
+    <div className="bg-zinc-50">
       <Header authed={authed} />
       <main className="mx-auto max-w-3xl px-5 py-14">
-        <h1 className="text-[28px] font-semibold tracking-tight text-slate-900">{title}</h1>
-        <p className="mt-2 text-[14px] text-slate-500">Редакция от {COMPANY.documentsRevision}</p>
-        <div className="mt-8 space-y-4 text-[15px] leading-relaxed text-slate-700 [&_h2]:mt-8 [&_h2]:text-[18px] [&_h2]:font-semibold [&_h2]:text-slate-900 [&_li]:ml-5 [&_li]:list-disc">
+        <h1 className="text-[28px] font-semibold tracking-tight text-zinc-900">{title}</h1>
+        <p className="mt-2 text-[14px] text-zinc-500">Редакция от {COMPANY.documentsRevision}</p>
+        <div className="mt-8 space-y-4 text-[15px] leading-relaxed text-zinc-700 [&_h2]:mt-8 [&_h2]:text-[18px] [&_h2]:font-semibold [&_h2]:text-zinc-900 [&_li]:ml-5 [&_li]:list-disc">
           {children}
           <h2>Реквизиты и контакты</h2>
           <p>

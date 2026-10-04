@@ -1,9 +1,9 @@
 export const STATUS: Record<string, { label: string; cls: string }> = {
-  draft: { label: "Черновик", cls: "bg-slate-100 text-slate-600" },
-  in_progress: { label: "В работе", cls: "bg-blue-50 text-brand" },
+  draft: { label: "Черновик", cls: "bg-zinc-100 text-zinc-600" },
+  in_progress: { label: "В работе", cls: "bg-brand-soft text-brand" },
   review: { label: "На проверке", cls: "bg-amber-50 text-warn" },
   completed: { label: "Завершена", cls: "bg-green-50 text-ok" },
-  archived: { label: "Архив", cls: "bg-slate-100 text-slate-500" },
+  archived: { label: "Архив", cls: "bg-zinc-100 text-zinc-500" },
 };
 
 export const WALL_OPTIONS: Array<[string, string]> = [

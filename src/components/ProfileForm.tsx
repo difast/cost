@@ -68,7 +68,7 @@ function Inner({ initial }: { initial: P }) {
         <h1 className="text-xl font-semibold">Профиль оценщика</h1>
         <p className="text-muted">Заполняется один раз и автоматически подставляется во все отчёты. Сроки действия документов контролируются.</p>
       </div>
-      {welcome && <div className="rounded-md bg-blue-50 px-4 py-3 text-brand">Добро пожаловать! Заполните сведения об оценщике — без них отчёт не будет сформирован.</div>}
+      {welcome && <div className="rounded-md bg-brand-soft px-4 py-3 text-brand">Добро пожаловать! Заполните сведения об оценщике — без них отчёт не будет сформирован.</div>}
 
       <div className="card p-4">
         <div className="card-t mb-3">Оценщик</div>

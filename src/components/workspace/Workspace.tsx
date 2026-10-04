@@ -108,10 +108,10 @@ export function Workspace({ id }: { id: string }) {
           <button
             key={k}
             onClick={() => go(k)}
-            className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm ${tab === k ? "border-brand font-medium text-brand" : "border-transparent text-slate-600 hover:text-ink"}`}
+            className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm ${tab === k ? "border-brand font-medium text-brand" : "border-transparent text-zinc-600 hover:text-ink"}`}
           >
             {l}
-            {counts[k] !== undefined && counts[k] !== null && <span className="badge bg-slate-100 text-slate-600">{counts[k]}</span>}
+            {counts[k] !== undefined && counts[k] !== null && <span className="badge bg-zinc-100 text-zinc-600">{counts[k]}</span>}
           </button>
         ))}
       </div>

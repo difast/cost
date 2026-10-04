@@ -4,9 +4,10 @@
 
 import { AbsoluteFill, Img, Sequence, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 
-const BRAND = "#1f45a8";
+const BRAND = "#1e6b50";
+const GRAPHITE = "#24282f";
 const INK = "#0f172a";
-const FONT = "Inter, 'Segoe UI', Roboto, 'DejaVu Sans', Arial, sans-serif";
+const FONT = "'Inter Variable', Inter, 'Segoe UI', Roboto, 'DejaVu Sans', Arial, sans-serif";
 
 const INTRO = 90;
 const SCENE = 120;
@@ -60,11 +61,11 @@ const Scene = ({ img, step, title, text }: (typeof SCENES)[number]) => {
       <div
         style={{
           position: "absolute", left: 64, bottom: 64, maxWidth: 1000, padding: "30px 40px", borderRadius: 18,
-          background: "#0f172a", color: "#fff", display: "flex", gap: 28, alignItems: "center",
+          background: GRAPHITE, color: "#fff", display: "flex", gap: 28, alignItems: "center",
           transform: `translateY(${(1 - enter) * 30}px)`, opacity: enter,
         }}
       >
-        <div style={{ fontSize: 56, fontWeight: 700, color: "#93b4ff", fontFamily: "monospace" }}>{step}</div>
+        <div style={{ fontSize: 56, fontWeight: 700, color: "#7fc4a6", fontFamily: "monospace" }}>{step}</div>
         <div>
           <div style={{ fontSize: 50, fontWeight: 700, lineHeight: 1.1 }}>{title}</div>
           <div style={{ marginTop: 10, fontSize: 30, lineHeight: 1.35, color: "#cbd5e1" }}>{text}</div>

@@ -108,7 +108,7 @@ export function CalculationTab({ detail, calc, reload, go }: WsProps) {
                     <tbody>
                       <tr><td className="py-0.5 text-muted">Цена за м²</td><td className="num py-0.5 text-right">{c.unitPriceFormula}</td></tr>
                       {c.steps.map((st) => (
-                        <tr key={st.code} className={Number(st.value) === 0 ? "text-slate-400" : ""}>
+                        <tr key={st.code} className={Number(st.value) === 0 ? "text-zinc-400" : ""}>
                           <td className="py-0.5 pr-2">{st.name} <span className="num">{fmtPercent(st.value, 2, true)}</span></td>
                           <td className="num py-0.5 text-right">{fmtNumber(st.after)}</td>
                         </tr>

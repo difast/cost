@@ -41,7 +41,7 @@ export function DirectoryList() {
           <tbody>
             {list?.map((s) => (
               <tr key={s.id}>
-                <td><Link className="font-medium text-brand hover:underline" href={`/app/directory/${s.id}`}>{s.name}</Link>{s.isDemo && <span className="badge ml-2 bg-amber-50 text-warn">демо</span>}{s.editable && <span className="badge ml-2 bg-blue-50 text-brand">мой</span>}</td>
+                <td><Link className="font-medium text-brand hover:underline" href={`/app/directory/${s.id}`}>{s.name}</Link>{s.isDemo && <span className="badge ml-2 bg-amber-50 text-warn">демо</span>}{s.editable && <span className="badge ml-2 bg-brand-soft text-brand">мой</span>}</td>
                 <td className="num">{s.edition}</td>
                 <td>{s.publisher ?? "—"}</td>
                 <td className="num">{fmtDate(s.actualDate)}</td>

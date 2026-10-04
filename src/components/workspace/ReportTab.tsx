@@ -68,7 +68,7 @@ export function ReportTab({ detail, calc, reload, go }: WsProps) {
       {(detail.calculation?.versions.length ?? 0) > 0 && (
         <div className="card">
           <div className="card-h"><div className="card-t">Повторное формирование по зафиксированной версии</div><span className="text-xs text-muted">те же данные и коэффициенты, что на момент расчёта</span></div>
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-zinc-100">
             {detail.calculation!.versions.map((v) => (
               <li key={v.id} className="flex items-center justify-between px-4 py-2">
                 <span>Версия № {v.versionNumber} от {new Date(v.createdAt).toLocaleDateString("ru-RU")}</span>

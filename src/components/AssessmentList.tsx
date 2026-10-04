@@ -86,7 +86,7 @@ export function AssessmentList() {
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id} className="cursor-pointer hover:bg-slate-50" onClick={() => (location.href = `/app/assessments/${r.id}`)}>
+                  <tr key={r.id} className="cursor-pointer hover:bg-zinc-50" onClick={() => (location.href = `/app/assessments/${r.id}`)}>
                     <td className="num font-medium"><Link href={`/app/assessments/${r.id}`} className="text-brand">{r.number}</Link></td>
                     <td>
                       <div>{r.property?.address ?? <span className="text-muted">Адрес не указан</span>}</div>

@@ -22,7 +22,7 @@ export default function Page() {
                 <td className="font-medium">{s.name}{s.note && <div className="text-xs font-normal text-muted">{s.note}</div>}</td>
                 <td>{ACCESS[s.access]}</td>
                 <td className="text-xs">{s.capabilities.map((c) => CAP[c]).join(", ")}</td>
-                <td>{s.configured ? <span className="badge bg-green-50 text-ok">подключён</span> : <span className="badge bg-slate-100 text-slate-500">планируется</span>}</td>
+                <td>{s.configured ? <span className="badge bg-green-50 text-ok">подключён</span> : <span className="badge bg-zinc-100 text-zinc-500">планируется</span>}</td>
               </tr>
             ))}
           </tbody>

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import "@fontsource-variable/inter";
 import "./globals.css";
 import { SITE_URL } from "@/lib/site";
 
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
   icons: { icon: [{ url: "/icons/icon.svg", type: "image/svg+xml" }, { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }], apple: "/icons/apple-touch-icon.png" },
 };
 
-export const viewport: Viewport = { themeColor: "#1d4ed8", width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { themeColor: "#1e6b50", width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

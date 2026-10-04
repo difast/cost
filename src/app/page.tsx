@@ -66,7 +66,7 @@ function JsonLd() {
 export default async function Home() {
   const authed = !!(await currentUser().catch(() => null));
   return (
-    <div className="bg-slate-50 text-slate-900">
+    <div className="bg-zinc-50 text-zinc-900">
       <JsonLd />
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2">К содержанию</a>
       <Header authed={authed} />

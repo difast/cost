@@ -86,7 +86,7 @@ export function DirectoryDetail({ id }: { id: string }) {
       <div className="card p-4">
         <h1 className="text-lg font-semibold">{s.name}</h1>
         <div className="mt-1 text-muted">Редакция {s.edition} · {s.publisher ?? "издатель не указан"} · актуален на {fmtDate(s.actualDate)} · используется в оценках: {s._count.assessments}</div>
-        {s.licenseNote && <div className={`mt-2 rounded-md px-3 py-2 text-xs ${s.isDemo ? "bg-amber-50 text-warn" : "bg-slate-50 text-muted"}`}>{s.licenseNote}</div>}
+        {s.licenseNote && <div className={`mt-2 rounded-md px-3 py-2 text-xs ${s.isDemo ? "bg-amber-50 text-warn" : "bg-zinc-50 text-muted"}`}>{s.licenseNote}</div>}
         {!s.editable && <div className="mt-2 text-xs text-muted">Системная редакция доступна только для чтения. Создайте собственную редакцию, чтобы изменить значения.</div>}
       </div>
       <div className="grid gap-3 md:grid-cols-2">

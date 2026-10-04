@@ -41,10 +41,10 @@ export function NormativeLibrary() {
                 <div className="font-medium">{d.code && <span className="mr-2 text-brand">{d.code}</span>}{d.title}</div>
                 <div className="text-xs text-muted">{d.issuer}{d.adoptedAt ? ` · ${fmtDate(d.adoptedAt)}` : ""} · ред. {d.revision}</div>
               </div>
-              <span className={`badge shrink-0 ${d.status === "active" ? "bg-green-50 text-ok" : "bg-slate-100 text-slate-500"}`}>{d.status === "active" ? "действует" : d.status === "repealed" ? "утратил силу" : "проект"}</span>
+              <span className={`badge shrink-0 ${d.status === "active" ? "bg-green-50 text-ok" : "bg-zinc-100 text-zinc-500"}`}>{d.status === "active" ? "действует" : d.status === "repealed" ? "утратил силу" : "проект"}</span>
             </div>
-            {d.summary && <p className="mt-2 text-sm text-slate-600">{d.summary}</p>}
-            <div className="mt-2 flex flex-wrap gap-1">{d.tags.map((t) => <span key={t} className="badge bg-slate-100 text-slate-600">{t}</span>)}</div>
+            {d.summary && <p className="mt-2 text-sm text-zinc-600">{d.summary}</p>}
+            <div className="mt-2 flex flex-wrap gap-1">{d.tags.map((t) => <span key={t} className="badge bg-zinc-100 text-zinc-600">{t}</span>)}</div>
             {d.url && <a href={d.url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs text-brand hover:underline">Официальный текст →</a>}
           </div>
         ))}

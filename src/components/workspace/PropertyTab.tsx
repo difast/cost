@@ -21,7 +21,7 @@ function Src({ prov, k }: { prov: Provenance; k: string }) {
   if (!p) return null;
   const egrn = p.source?.startsWith("egrn");
   return (
-    <span title={`${p.title ?? ""} · ${fmtDate(p.at ?? null)}`} className={`badge ${egrn ? "bg-green-50 text-ok" : "bg-slate-100 text-slate-500"}`}>
+    <span title={`${p.title ?? ""} · ${fmtDate(p.at ?? null)}`} className={`badge ${egrn ? "bg-green-50 text-ok" : "bg-zinc-100 text-zinc-500"}`}>
       {egrn ? "ЕГРН" : "вручную"}
     </span>
   );
@@ -161,7 +161,7 @@ export function PropertyTab({ detail, reload }: WsProps) {
             <Field label="Ближайшее метро"><TextInput d={P} k="metroName" set={sP} /></Field>
             <Field label="Расстояние до метро, м" hint="Используется в корректировке на транспортную доступность"><NumInput d={P} k="metroDistanceM" set={sP} /></Field>
           </div>
-          <div className="mt-3 rounded-md bg-slate-50 p-3 text-xs text-muted">
+          <div className="mt-3 rounded-md bg-zinc-50 p-3 text-xs text-muted">
             Автоматический расчёт расстояний до метро, остановок, школ и другой инфраструктуры появится после подключения картографического сервиса по договору (версия 2).
           </div>
         </div>
@@ -191,7 +191,7 @@ export function PropertyTab({ detail, reload }: WsProps) {
             <input ref={docRef} type="file" accept="image/png,image/jpeg,application/pdf" multiple hidden onChange={(e) => e.target.files && uploadFiles(e.target.files, "document")} />
             <button className="btn btn-secondary" onClick={() => docRef.current?.click()}>Добавить документ</button>
           </div>
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-zinc-100">
             {docs.map((f) => (
               <li key={f.id} className="flex items-center justify-between px-4 py-2">
                 <a href={`/api/files/${f.id}`} className="truncate text-brand hover:underline">{f.caption ?? f.filename}</a>

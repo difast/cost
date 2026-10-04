@@ -70,7 +70,7 @@ function ComparableForm({ assessmentId, initial, onDone, onCancel }: { assessmen
           <Field label="Адрес *" className="md:col-span-4"><TextInput d={D} k="address" set={set} /></Field>
           <Field label="Цена предложения, ₽ *"><NumInput d={D} k="price" set={set} /></Field>
           <Field label="Общая площадь, м² *"><NumInput d={D} k="area" set={set} /></Field>
-          <Field label="Цена за м²"><div className="input num bg-slate-50">{unit ? fmtNumber(unit, 2) : "—"}</div></Field>
+          <Field label="Цена за м²"><div className="input num bg-zinc-50">{unit ? fmtNumber(unit, 2) : "—"}</div></Field>
           <Field label="Комнат"><NumInput d={D} k="rooms" set={set} /></Field>
           <Field label="Этаж"><NumInput d={D} k="floor" set={set} /></Field>
           <Field label="Этажность"><NumInput d={D} k="floors" set={set} /></Field>
@@ -139,7 +139,7 @@ export function ComparablesTab({ detail, reload, calc, go }: WsProps) {
             <button className="btn btn-primary" onClick={() => setEditing("new")}>+ Добавить аналог</button>
           </div>
         </div>
-        {msg && <div className="border-b border-line bg-blue-50 px-4 py-2 text-xs text-brand">{msg}</div>}
+        {msg && <div className="border-b border-line bg-brand-soft px-4 py-2 text-xs text-brand">{msg}</div>}
         <div className="overflow-x-auto">
           <table className="tbl">
             <thead>
@@ -148,7 +148,7 @@ export function ComparablesTab({ detail, reload, calc, go }: WsProps) {
                 <th className="text-right">Цена, ₽</th><th className="text-right">S, м²</th><th className="text-right">₽/м²</th>
                 <th className="text-right">Скорр. ₽/м²</th><th>Комн.</th><th>Этаж</th><th>Материал</th><th>Отделка</th><th>Мебель</th><th>Метро</th><th>Скрин</th><th></th>
               </tr>
-              <tr className="bg-blue-50/40 text-xs">
+              <tr className="bg-brand-soft/60 text-xs">
                 <td className="px-2.5 py-1.5"></td>
                 <td className="px-2.5 py-1.5 font-medium">Объект</td>
                 <td className="px-2.5 py-1.5 text-muted">дата оценки {fmtDate(detail.valuationDate)}</td>

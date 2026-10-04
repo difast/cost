@@ -24,7 +24,7 @@ export function AppNav({ email, docWarnings }: { email: string; docWarnings: num
           key={n.href}
           href={n.href}
           onClick={() => setOpen(false)}
-          className={`flex items-center justify-between rounded-md px-3 py-2 ${active(n) ? "bg-blue-50 font-medium text-brand" : "text-slate-600 hover:bg-slate-100"}`}
+          className={`flex items-center justify-between rounded-md px-3 py-2 ${active(n) ? "bg-brand-soft font-medium text-brand" : "text-zinc-600 hover:bg-zinc-100"}`}
         >
           {n.label}
           {n.href === "/app/profile" && docWarnings > 0 && <span className="badge bg-amber-100 text-warn">{docWarnings}</span>}

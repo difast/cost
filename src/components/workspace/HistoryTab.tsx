@@ -10,10 +10,10 @@ const ACTIONS: Record<string, string> = { create: "Создание", update: "�
 
 function DiffView({ diff }: { diff: unknown }) {
   if (!diff || typeof diff !== "object") return null;
-  if (Array.isArray(diff)) return <pre className="mt-1 overflow-x-auto rounded bg-slate-50 p-2 text-[11px]">{JSON.stringify(diff, null, 1)}</pre>;
+  if (Array.isArray(diff)) return <pre className="mt-1 overflow-x-auto rounded bg-zinc-50 p-2 text-[11px]">{JSON.stringify(diff, null, 1)}</pre>;
   const entries = Object.entries(diff as Record<string, unknown>);
   const isPairs = entries.every(([, v]) => Array.isArray(v) && v.length === 2);
-  if (!isPairs) return <pre className="mt-1 overflow-x-auto rounded bg-slate-50 p-2 text-[11px]">{JSON.stringify(diff, null, 1)}</pre>;
+  if (!isPairs) return <pre className="mt-1 overflow-x-auto rounded bg-zinc-50 p-2 text-[11px]">{JSON.stringify(diff, null, 1)}</pre>;
   return (
     <table className="mt-1 text-[11px]">
       <tbody>
@@ -42,12 +42,12 @@ export function HistoryTab({ detail }: WsProps) {
   return (
     <div className="card">
       <div className="card-h"><div className="card-t">История изменений</div><span className="text-xs text-muted">{events.length} событий</span></div>
-      <ul className="divide-y divide-slate-100">
+      <ul className="divide-y divide-zinc-100">
         {events.map((e) => (
           <li key={e.id} className="px-4 py-2.5">
             <div className="flex cursor-pointer items-start gap-3" onClick={() => setOpen(open === e.id ? null : e.id)}>
               <span className="num w-36 shrink-0 text-xs text-muted">{new Date(e.createdAt).toLocaleString("ru-RU")}</span>
-              <span className="badge shrink-0 bg-slate-100 text-slate-600">{ACTIONS[e.action] ?? e.action}</span>
+              <span className="badge shrink-0 bg-zinc-100 text-zinc-600">{ACTIONS[e.action] ?? e.action}</span>
               <span className="flex-1">{e.summary}</span>
               <span className="shrink-0 text-xs text-muted">{e.user?.name || e.user?.email}</span>
             </div>
