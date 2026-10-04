@@ -9,6 +9,6 @@ export const POST = api(async (req, { params }: Params<"id">) => {
   const u = await requireUser();
   const { id } = await params;
   await getOwned(id, u.id);
-  const { status } = await body(req, z.object({ status: z.enum(["draft", "review", "approved"]) }));
-  return ok(await setStatus(id, u.id, status));
+  const { status, acknowledge } = await body(req, z.object({ status: z.enum(["draft", "review", "approved"]), acknowledge: z.boolean().optional() }));
+  return ok(await setStatus(id, u.id, status, acknowledge));
 });

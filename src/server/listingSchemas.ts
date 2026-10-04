@@ -9,6 +9,7 @@ export const listingQuerySchema = z.object({
   locality: s,
   district: s,
   q: s,
+  street: s,
   center: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }).nullish().transform((v) => v ?? null),
   radiusM: z.coerce.number().int().min(100).max(50_000).nullish().transform((v) => v ?? null),
   rooms: z.array(z.coerce.number().int().min(0).max(20)).max(10).default([]),
@@ -23,4 +24,4 @@ export const listingQuerySchema = z.object({
   secondaryOnly: z.boolean().default(true),
   dedupe: z.boolean().default(true),
   limit: z.coerce.number().int().min(1).max(1000).default(300),
-}).refine((q) => q.region || q.locality || q.q, { message: "Укажите регион, населённый пункт или адрес для поиска" });
+}).refine((q) => q.region || q.locality || q.q || q.street, { message: "Укажите населённый пункт (город) для поиска" });

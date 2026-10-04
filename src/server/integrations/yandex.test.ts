@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { distanceM, geocode, nearestMetro, parseGeocoderResponse, parseSearchResponse, reverseGeocode, searchOrganizations } from "./yandex";
+import { distanceM, geocode, geocodeMany, nearestMetro, parseGeocoderResponse, parseSearchResponse, reverseGeocode, searchOrganizations } from "./yandex";
 import { collectInfrastructure } from "@/server/services/infrastructure";
 import { INFRA_CATEGORIES } from "@/core/infrastructure";
 
@@ -145,5 +145,57 @@ describe("сбор инфраструктуры", () => {
     expect(byKey.pharmacy.items.map((i) => i.name)).toEqual(["аптека рядом"]);
     expect(byKey.metro.items[0].name).toBe("метро Ближняя");
     expect(s.center).toEqual(C);
+  });
+});
+
+describe("геокодер: несколько результатов и ошибки API", () => {
+  it("несколько вариантов адреса", async () => {
+    respond(geoResp([
+      { name: "Тверская улица, 1", pos: "37.61 55.757", formatted: "Москва, Тверская улица, 1" },
+      { name: "Тверская улица, 1", pos: "35.9 56.86", formatted: "Тверь, Тверская улица, 1", precision: "street", kind: "street" },
+    ]));
+    const r = await geocodeMany("Тверская 1", 5);
+    expect(r.map((x) => x.formatted)).toEqual(["Москва, Тверская улица, 1", "Тверь, Тверская улица, 1"]);
+    expect(r[1].precision).toBe("street");
+    expect(lastUrl().searchParams.get("results")).toBe("5");
+  });
+  it("лимит запросов (429) — понятная ошибка 429", async () => {
+    respond({ message: "Too Many Requests" }, 429);
+    await expect(geocode("Москва")).rejects.toMatchObject({ status: 429, message: expect.stringContaining("лимит запросов") });
+  });
+  it("ошибка сервиса (500) — ошибка 502 с кодом", async () => {
+    respond({}, 500);
+    await expect(geocode("Москва")).rejects.toMatchObject({ status: 502, message: expect.stringContaining("HTTP 500") });
+  });
+  it("таймаут — ошибка 504, без зависания", async () => {
+    process.env.YANDEX_TIMEOUT_MS = "30";
+    fetchMock.mockImplementationOnce((_u: unknown, init: { signal: AbortSignal }) => new Promise((_, rej) => init.signal.addEventListener("abort", () => rej(init.signal.reason))));
+    await expect(geocode("Москва")).rejects.toMatchObject({ status: 504, message: expect.stringContaining("не ответил") });
+    delete process.env.YANDEX_TIMEOUT_MS;
+  });
+  it("сетевая ошибка — 502 «недоступен»", async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
+    await expect(geocode("Москва")).rejects.toMatchObject({ status: 502, message: expect.stringContaining("недоступен") });
+  });
+  it("некорректный ответ — ошибка, а не падение", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("<html>", { status: 200 }));
+    await expect(geocode("Москва")).rejects.toMatchObject({ status: 502 });
+  });
+});
+
+describe("организации: пустой результат", () => {
+  it("ни одной организации в радиусе — категории пустые, статус ok", async () => {
+    fetchMock.mockImplementation(async (input: string | URL) => {
+      const u = new URL(String(input));
+      if (u.searchParams.get("kind") === "metro") return new Response(JSON.stringify(geoResp([])));
+      return new Response(JSON.stringify(bizResp([])));
+    });
+    const s = await collectInfrastructure(C);
+    expect(s.categories.every((c) => c.status === "empty" && c.items.length === 0)).toBe(true);
+  });
+  it("организация: название, тип, адрес, расстояние, координаты", () => {
+    const [p] = parseSearchResponse(bizResp([{ name: "Аптека", lon: 37.601, lat: 55.751, address: "ул. Тестовая, 2", category: "Аптека" }]), C);
+    expect(p).toMatchObject({ name: "Аптека", type: "Аптека", address: "ул. Тестовая, 2", lat: 55.751, lon: 37.601 });
+    expect(p.distanceM).toBeGreaterThan(100);
   });
 });

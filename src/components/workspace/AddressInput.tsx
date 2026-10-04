@@ -1,38 +1,64 @@
 "use client";
 
-// Поле адреса с подсказками из ГАР (ФИАС). Если справочник не загружен — обычное поле ввода.
+// Поле адреса с подсказками: ГАР (ФИАС), если справочник загружен, иначе — варианты Яндекс Геокодера.
+// Запросы — с задержкой 350 мс после ввода и с кэшем ответов; ошибки подсказок не мешают ручному вводу.
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import type { AddressSuggestion } from "@/core/address";
 
-export interface GarHit { guid: string; fullAddress: string; locality: string | null; street: string | null; house: string | null }
+interface SearchResponse { available: boolean; items: AddressSuggestion[]; sources: Array<"gar" | "yandex">; warning: string | null }
 
-export function AddressInput({ value, onChange, onPick }: { value: string; onChange: (v: string) => void; onPick: (h: GarHit) => void }) {
-  const [items, setItems] = useState<GarHit[]>([]);
+const SOURCE_LABEL = { gar: "ГАР", yandex: "Яндекс Геокодер" } as const;
+
+export function AddressInput({ value, onChange, onPick }: { value: string; onChange: (v: string) => void; onPick: (s: AddressSuggestion) => void }) {
+  const [items, setItems] = useState<AddressSuggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
-  const available = useRef<boolean | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [warning, setWarning] = useState<string | null>(null);
   const typed = useRef(false);
+  const cache = useRef(new Map<string, SearchResponse>());
 
   useEffect(() => {
-    if (!typed.current || available.current === false || value.trim().length < 3) return setItems([]);
+    const q = value.trim();
+    if (!typed.current || q.length < 3) {
+      setItems([]);
+      setOpen(false);
+      return;
+    }
+    const show = (r: SearchResponse) => {
+      setItems(r.items);
+      setWarning(r.items.length ? null : r.warning);
+      setActive(-1);
+      setOpen(r.items.length > 0);
+    };
+    const hit = cache.current.get(q.toLowerCase());
+    if (hit) return show(hit);
+    let alive = true;
     const t = setTimeout(() => {
-      api.get<{ available: boolean; items: GarHit[] }>(`/api/address/search?q=${encodeURIComponent(value)}`)
+      setLoading(true);
+      api.get<SearchResponse>(`/api/address/search?q=${encodeURIComponent(q)}`)
         .then((r) => {
-          available.current = r.available;
-          setItems(r.items);
-          setActive(-1);
-          setOpen(r.items.length > 0);
+          cache.current.set(q.toLowerCase(), r);
+          if (alive) show(r);
         })
-        .catch(() => undefined);
-    }, 300);
-    return () => clearTimeout(t);
+        .catch(() => alive && setWarning("Подсказки адреса временно недоступны — адрес можно ввести вручную"))
+        .finally(() => alive && setLoading(false));
+    }, 350);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
   }, [value]);
 
-  const pick = (h: GarHit) => {
+  const pick = (s: AddressSuggestion) => {
     typed.current = false;
-    onPick(h);
     setOpen(false);
+    setWarning(null);
+    onPick(s);
   };
+
+  const sources = [...new Set(items.map((i) => i.source))];
 
   return (
     <div className="relative">
@@ -42,10 +68,12 @@ export function AddressInput({ value, onChange, onPick }: { value: string; onCha
         role="combobox"
         aria-expanded={open}
         aria-autocomplete="list"
+        placeholder="Начните вводить адрес и выберите вариант из списка"
         onChange={(e) => {
           typed.current = true;
           onChange(e.target.value);
         }}
+        onFocus={() => items.length && typed.current && setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         onKeyDown={(e) => {
           if (!open) return;
@@ -55,18 +83,21 @@ export function AddressInput({ value, onChange, onPick }: { value: string; onCha
           else if (e.key === "Escape") setOpen(false);
         }}
       />
+      {loading && <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-muted">поиск…</span>}
       {open && (
         <ul className="absolute left-0 right-0 top-[calc(100%+4px)] z-30 max-h-72 overflow-y-auto rounded-md border border-line bg-white py-1 shadow-lg" role="listbox">
-          {items.map((h, i) => (
-            <li key={h.guid} role="option" aria-selected={i === active}>
-              <button type="button" className={`block w-full px-3 py-1.5 text-left text-[13px] ${i === active ? "bg-brand-soft" : "hover:bg-subtle"}`} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(h)}>
-                {h.fullAddress}
+          {items.map((s, i) => (
+            <li key={s.id} role="option" aria-selected={i === active}>
+              <button type="button" className={`block w-full px-3 py-1.5 text-left text-[13px] ${i === active ? "bg-brand-soft" : "hover:bg-subtle"}`} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(s)}>
+                {s.fullAddress}
+                {s.source === "yandex" && s.precision && s.precision !== "exact" && <span className="ml-1.5 text-[11px] text-muted">({s.precision === "street" ? "только улица" : "неточно"})</span>}
               </button>
             </li>
           ))}
-          <li className="border-t border-line px-3 pt-1.5 text-[11px] text-muted">Государственный адресный реестр (ГАР)</li>
+          <li className="border-t border-line px-3 pt-1.5 text-[11px] text-muted">{sources.map((s) => SOURCE_LABEL[s]).join(", ")}</li>
         </ul>
       )}
+      {warning && !open && <div className="mt-1 text-[11.5px] text-muted">{warning}</div>}
     </div>
   );
 }

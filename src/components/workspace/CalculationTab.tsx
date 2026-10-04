@@ -6,7 +6,8 @@ import { fmtNumber, fmtPercent, amountInWords } from "@/core/format";
 import { d } from "@/core/calc/decimal";
 import type { CalcSettings } from "@/core/calc/types";
 import { WEIGHT_METHODS, WEIGHT_ROUNDING_NOTE } from "@/core/calc/weights";
-import { BLOCKED_MESSAGE, DISPERSION_MESSAGE, calcQuality } from "@/core/calc/quality";
+import { ISSUES_MESSAGE, DISPERSION_MESSAGE, calcQuality } from "@/core/calc/quality";
+import { AckModal, needsAck, type AckRequest } from "./AckModal";
 import { Icon } from "@/components/ui/Icon";
 import { Badge, EmptyState, Notice, Panel, toast } from "@/components/ui/kit";
 import { NextStep, StepIssues } from "./common";
@@ -15,6 +16,7 @@ import type { WsProps } from "./Workspace";
 const METHOD_ORDER: CalcSettings["weightMethod"][] = ["inverse_gross", "linear_gross", "equal", "manual"];
 
 export function CalculationTab({ detail, calc, reload, checklist, go }: WsProps) {
+  const [ack, setAck] = useState<AckRequest | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [weights, setWeights] = useState<Record<string, string>>(calc?.settings.manualWeights ?? {});
@@ -36,15 +38,17 @@ export function CalculationTab({ detail, calc, reload, checklist, go }: WsProps)
       setBusy(false);
     }
   }
-  async function commit() {
+  async function commit(acknowledge = false) {
     setBusy(true);
     setError(null);
     try {
-      const v = await api.post<{ versionNumber: number; created: boolean }>(`/api/assessments/${detail.id}/calculation`, {});
+      const v = await api.post<{ versionNumber: number; created: boolean }>(`/api/assessments/${detail.id}/calculation`, { acknowledge });
       toast(v.created ? `Расчёт подтверждён: версия № ${v.versionNumber}` : "Расчёт уже подтверждён", "info");
       await reload();
     } catch (e) {
-      setError(errorText(e));
+      const issues = needsAck(e);
+      if (issues) setAck({ title: "Подтвердить расчёт с замечаниями?", message: `${ISSUES_MESSAGE} Расчёт будет подтверждён, замечания сохранятся в версии и останутся в контроле качества.`, issues, run: () => commit(true) });
+      else setError(errorText(e));
     } finally {
       setBusy(false);
     }
@@ -70,15 +74,15 @@ export function CalculationTab({ detail, calc, reload, checklist, go }: WsProps)
           <>
             <div className="font-medium text-ink">{latest ? `Данные изменились после подтверждения версии № ${latest.versionNumber} — расчёт требует обновления` : "Расчёт ещё не подтверждён"}</div>
             <div className={allErrors.length ? "text-err" : "text-muted"}>
-              {allErrors.length ? `${BLOCKED_MESSAGE} Ошибок: ${allErrors.length}.` : "При подтверждении сохраняется неизменяемый снимок: объект, аналоги, корректировки, коэффициенты, веса, формулы и итог."}
+              {allErrors.length ? `${ISSUES_MESSAGE} Ошибок: ${allErrors.length} — расчёт можно подтвердить с замечаниями.` : "При подтверждении сохраняется неизменяемый снимок: объект, аналоги, корректировки, коэффициенты, веса, формулы и итог."}
             </div>
           </>
         )}
       </div>
       <div className="flex shrink-0 flex-wrap gap-2">
-        {allErrors.length > 0 && <button className="btn btn-secondary" onClick={() => go("checks")}>Ошибки</button>}
+        {allErrors.length > 0 && <button className="btn btn-secondary" onClick={() => go("checks")}>Замечания</button>}
         {calc.isStale ? (
-          <button className="btn btn-primary" disabled={busy || allErrors.length > 0} onClick={commit}><Icon name="check" size={15} />Подтвердить расчёт</button>
+          <button className="btn btn-primary" disabled={busy} onClick={() => commit()}><Icon name="check" size={15} />Подтвердить расчёт</button>
         ) : (
           <a className="btn btn-secondary" href={`/api/assessments/${detail.id}/calculation/xlsx`}><Icon name="download" size={15} />Расчёт XLSX</a>
         )}
@@ -286,7 +290,7 @@ export function CalculationTab({ detail, calc, reload, checklist, go }: WsProps)
                   <div><dt className="text-muted">Разброс после корректировок</dt><dd className={`tnum break-words ${q.dispersionGrew ? "text-warn" : "text-ink"}`}>коэф. вариации {fmtPercent(q.cvAfter)}</dd></div>
                 </dl>
                 {q.dispersionGrew && <Notice tone="warn" className="mt-3">{DISPERSION_MESSAGE}</Notice>}
-                {allErrors.length > 0 && <Notice tone="err" className="mt-3">{BLOCKED_MESSAGE}</Notice>}
+                {allErrors.length > 0 && <Notice tone="warn" className="mt-3">{ISSUES_MESSAGE} Ошибок: {allErrors.length}. <button className="underline-offset-2 hover:underline" onClick={() => go("checks")}>Открыть контроль качества</button></Notice>}
               </Panel>
             )}
           </div>
@@ -298,7 +302,7 @@ export function CalculationTab({ detail, calc, reload, checklist, go }: WsProps)
         title="Версии расчёта"
         description="Версия хранит полный снимок данных и коэффициентов — старую оценку можно воспроизвести в точности"
         actions={
-          <button className="btn btn-secondary btn-sm" disabled={busy || !r || !calc.isStale || allErrors.length > 0} onClick={commit} title={allErrors.length ? BLOCKED_MESSAGE : undefined}>
+          <button className="btn btn-secondary btn-sm" disabled={busy || !r || !calc.isStale} onClick={() => commit()}>
             {calc.isStale ? <><Icon name="check" size={14} />Подтвердить расчёт</> : "Версия актуальна"}
           </button>
         }
@@ -328,6 +332,7 @@ export function CalculationTab({ detail, calc, reload, checklist, go }: WsProps)
           <p className="px-4 py-4 text-[13px] text-muted">Версий пока нет. Версия фиксируется вручную или автоматически при формировании отчёта.</p>
         )}
       </Panel>
+      <AckModal req={ack} onClose={() => setAck(null)} />
       {r && <NextStep to="checks" go={go} />}
     </div>
   );

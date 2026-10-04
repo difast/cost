@@ -150,6 +150,8 @@ model Property {
   objectType      String     @default("Квартира")
   address         String?
   fiasId          String?
+  /// Нормализованный адрес: регион, населённый пункт, улица, дом, идентификаторы ГАР, источник
+  addressDetails  Json?
   cadastralNumber String?
   area            Decimal?   @db.Decimal(12, 2)
   livingArea      Decimal?   @db.Decimal(12, 2)
@@ -436,6 +438,8 @@ model Calculation {
   assessmentId String               @unique
   assessment   Assessment           @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   settings     Json                 @default("{}")
+  /// Состояние контроля качества: замечания, которые были и исправлены (статус «Исправлено»)
+  qualityState Json                 @default("{}")
   versions     CalculationVersion[]
   updatedAt    DateTime             @updatedAt
 }

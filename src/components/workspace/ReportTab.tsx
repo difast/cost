@@ -7,15 +7,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, errorText } from "@/lib/api";
 import { fmtNumber } from "@/core/format";
-import { BLOCKED_MESSAGE } from "@/core/calc/quality";
+import { ISSUES_MESSAGE } from "@/core/calc/quality";
 import { FIELD_BY_KEY } from "@/core/document/fields";
 import { DOC_STATUS_LABEL, hashBlocks, hashText, type DocBlock as RawBlock, type DocStatus, type DocumentContent, type DocTextBlock } from "@/core/document/model";
 import type { ResolvedBlock, ResolvedSection } from "@/core/document/render";
 import type { ReportDoc } from "@/core/report/model";
+import type { CheckIssue } from "@/core/checks";
 import { Icon } from "@/components/ui/Icon";
 import { Badge, ConfirmModal, Notice, Segmented, toast, type Tone } from "@/components/ui/kit";
 import { DOC_FONT, DocBlocks } from "./report/DocBlocks";
 import { PagedPreview } from "./report/PagedPreview";
+import { AckModal, needsAck, type AckRequest } from "./AckModal";
 import type { WsProps } from "./Workspace";
 
 interface DocVersion { id: string; versionNumber: number; status: string; createdAt: string; createdBy: string | null; note: string | null; docxFileId: string | null; pdfFileId: string | null; xlsxFileId: string | null; calculationVersionNumber: number; finalValue: string; outdated: boolean }
@@ -27,6 +29,8 @@ interface DocView {
   sections: ResolvedSection[];
   preview: ReportDoc | null;
   calc: { hasResult: boolean; finalValue: string | null; errors: number; warnings: number; confirmedVersion: number | null; isStale: boolean };
+  /** Расхождения документа с расчётом (ручные тексты и таблицы). */
+  docIssues: CheckIssue[];
   versions: DocVersion[];
 }
 
@@ -65,7 +69,7 @@ function TextArea({ value, onChange, className, autoFocus }: { value: string; on
   return <textarea ref={ref} autoFocus={autoFocus} rows={1} className={`block w-full resize-none overflow-hidden bg-transparent leading-[1.25] outline-none ${className}`} value={value} onChange={(e) => onChange(e.target.value)} />;
 }
 
-export function ReportTab({ detail, reload, go }: WsProps) {
+export function ReportTab({ detail, reload, go, focus }: WsProps) {
   const [view, setView] = useState<DocView | null>(null);
   const [content, setContent] = useState<DocumentContent | null>(null);
   const [mode, setMode] = useState<"editor" | "preview">("editor");
@@ -76,6 +80,14 @@ export function ReportTab({ detail, reload, go }: WsProps) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<{ title: string; items?: string[] } | null>(null);
   const [confirmFinal, setConfirmFinal] = useState(false);
+  // переход из «Контроля качества» к блоку документа
+  useEffect(() => {
+    if (focus?.startsWith("doc.")) {
+      setMode("editor");
+      setSelected(focus.slice(4));
+    }
+  }, [focus]);
+  const [ack, setAck] = useState<AckRequest | null>(null);
   const base = useRef<string | null>(null);
   const dirty = useRef(false);
   const latest = useRef<DocumentContent | null>(null);
@@ -141,29 +153,33 @@ export function ReportTab({ detail, reload, go }: WsProps) {
     }
   }
 
-  async function setStatus(status: "draft" | "review" | "approved") {
+  async function setStatus(status: "draft" | "review" | "approved", acknowledge = false) {
     setBusy(status);
     setError(null);
     try {
-      await api.post(`/api/assessments/${detail.id}/document/status`, { status });
+      await api.post(`/api/assessments/${detail.id}/document/status`, { status, acknowledge });
       toast(`Статус: ${DOC_STATUS_LABEL[status]}`);
       await load();
     } catch (e) {
+      const issues = needsAck(e);
+      if (issues) return setAck({ title: "Подтвердить отчёт с замечаниями?", message: `${ISSUES_MESSAGE} Отчёт можно подтвердить — замечания останутся в разделе «Замечания к оценке».`, issues, run: () => setStatus(status, true) });
       setError({ title: e instanceof ApiError ? e.message : errorText(e), items: e instanceof ApiError && Array.isArray(e.details) ? (e.details as Array<{ message: string }>).map((x) => x.message) : undefined });
     } finally {
       setBusy(null);
     }
   }
 
-  async function createVersion(final: boolean) {
+  async function createVersion(final: boolean, acknowledge = false) {
     setBusy(final ? "final" : "version");
     setError(null);
     setConfirmFinal(false);
     try {
-      const r = await api.post<{ versionNumber: number; calculationVersionNumber: number }>(`/api/assessments/${detail.id}/document/versions`, { final });
+      const r = await api.post<{ versionNumber: number; calculationVersionNumber: number }>(`/api/assessments/${detail.id}/document/versions`, { final, acknowledge });
       toast(final ? `Сформирована финальная версия № ${r.versionNumber}` : `Создана версия № ${r.versionNumber}`);
       await Promise.all([load(), reload()]);
     } catch (e) {
+      const issues = needsAck(e);
+      if (issues) return setAck({ title: final ? "Сформировать финальную версию с замечаниями?" : "Создать версию с замечаниями?", message: `${ISSUES_MESSAGE} Версию можно сформировать — замечания войдут в раздел «Замечания к оценке».`, issues, run: () => createVersion(final, true) });
       setError({ title: e instanceof ApiError ? e.message : errorText(e), items: e instanceof ApiError && Array.isArray(e.details) ? (e.details as Array<{ message: string }>).map((x) => x.message) : undefined });
     } finally {
       setBusy(null);
@@ -173,7 +189,8 @@ export function ReportTab({ detail, reload, go }: WsProps) {
   if (error && !view) return <Notice tone="err" title="Документ не загружен">{error.title}</Notice>;
   if (!view || !content) return <div className="card h-96 animate-pulse" />;
 
-  const blocked = view.calc.errors > 0 || !view.calc.hasResult;
+  const noResult = !view.calc.hasResult;
+  const hasIssues = view.calc.errors > 0 || view.calc.warnings > 0;
   const lastFinal = view.versions.find((v) => v.status === "final") ?? null;
   const sel = selected ? resolved.get(selected) ?? null : null;
   const selRaw = selected ? content.sections.flatMap((s) => s.blocks).find((b) => b.id === selected) ?? null : null;
@@ -190,22 +207,42 @@ export function ReportTab({ detail, reload, go }: WsProps) {
         </div>
         <div className="mt-2.5 grid gap-1.5">
           {view.status === "draft" && <button className="btn btn-secondary btn-sm h-auto justify-center whitespace-normal py-1.5 text-center leading-tight" disabled={!!busy} onClick={() => setStatus("review")}>На проверку</button>}
-          {view.status === "review" && <button className="btn btn-secondary btn-sm h-auto justify-center whitespace-normal py-1.5 text-center leading-tight" disabled={!!busy || blocked} onClick={() => setStatus("approved")}>Подтвердить</button>}
+          {view.status === "review" && <button className="btn btn-secondary btn-sm h-auto justify-center whitespace-normal py-1.5 text-center leading-tight" disabled={!!busy} onClick={() => setStatus("approved")}>Подтвердить</button>}
           {(view.status === "review" || view.status === "approved") && <button className="btn btn-ghost btn-sm h-auto justify-center whitespace-normal py-1.5 text-center leading-tight" disabled={!!busy} onClick={() => setStatus("draft")}>Вернуть в черновик</button>}
-          <button className="btn btn-secondary btn-sm h-auto justify-center whitespace-normal py-1.5 text-center leading-tight" disabled={!!busy || blocked} onClick={() => createVersion(false)} title={blocked ? BLOCKED_MESSAGE : "Зафиксировать документ и расчёт, сформировать файлы"}>
+          <button className="btn btn-secondary btn-sm h-auto justify-center whitespace-normal py-1.5 text-center leading-tight" disabled={!!busy} onClick={() => createVersion(false)} title="Зафиксировать документ и расчёт, сформировать файлы">
             {busy === "version" ? "Фиксация…" : "Создать версию"}
           </button>
-          <button className="btn btn-primary btn-sm h-auto justify-center whitespace-normal py-1.5 text-center leading-tight" disabled={!!busy || blocked} onClick={() => setConfirmFinal(true)}>
+          <button className="btn btn-primary btn-sm h-auto justify-center whitespace-normal py-1.5 text-center leading-tight" disabled={!!busy} onClick={() => setConfirmFinal(true)}>
             {busy === "final" ? "Формирование…" : "Сформировать финальную версию"}
           </button>
         </div>
-        {blocked && (
-          <p className="mt-2 text-[12px] leading-snug text-err">
-            {view.calc.hasResult ? BLOCKED_MESSAGE : "Расчёт ещё не выполнен."}{" "}
-            <button className="underline-offset-2 hover:underline" onClick={() => go(view.calc.hasResult ? "checks" : "comparables")}>Перейти</button>
+        <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+          <a className="btn btn-ghost btn-sm h-auto justify-center whitespace-normal py-1.5 text-center leading-tight" href={`/api/assessments/${detail.id}/document/draft?format=docx`}>Черновик DOCX</a>
+          <a className="btn btn-ghost btn-sm h-auto justify-center whitespace-normal py-1.5 text-center leading-tight" href={`/api/assessments/${detail.id}/document/draft?format=pdf`}>Черновик PDF</a>
+        </div>
+        {noResult && (
+          <p className="mt-2 text-[12px] leading-snug text-warn">
+            Расчёт ещё не выполнен — версию сформировать нельзя, но черновик можно редактировать и скачать.{" "}
+            <button className="underline-offset-2 hover:underline" onClick={() => go("comparables")}>К аналогам</button>
           </p>
         )}
-        {!blocked && view.calc.isStale && <p className="mt-2 text-[12px] leading-snug text-muted">Расчёт не подтверждён — он будет подтверждён при фиксации версии.</p>}
+        {!noResult && hasIssues && (
+          <p className="mt-2 text-[12px] leading-snug text-warn">
+            {ISSUES_MESSAGE} Ошибок: {view.calc.errors}, предупреждений: {view.calc.warnings}. Они выводятся в разделе «Замечания к оценке».{" "}
+            <button className="underline-offset-2 hover:underline" onClick={() => go("checks")}>Открыть контроль качества</button>
+          </p>
+        )}
+        {view.docIssues.length > 0 && (
+          <ul className="mt-2 space-y-1 text-[12px] leading-snug text-zinc-700">
+            {view.docIssues.map((i, k) => (
+              <li key={k} className={i.severity === "error" ? "text-err" : ""}>
+                {i.message}
+                {i.field && <button className="ml-1 text-brand underline-offset-2 hover:underline" onClick={() => go("report", i.field)}>Перейти</button>}
+              </li>
+            ))}
+          </ul>
+        )}
+        {!noResult && view.calc.isStale && <p className="mt-2 text-[12px] leading-snug text-muted">Расчёт не подтверждён — он будет подтверждён при фиксации версии.</p>}
       </section>
 
       <nav className="card p-2" aria-label="Структура отчёта">
@@ -259,7 +296,7 @@ export function ReportTab({ detail, reload, go }: WsProps) {
                 const editing = isSel || manual || b.template === undefined;
                 const value = manual ? b.text! : rt?.auto ?? "";
                 return (
-                  <div key={b.id} className={`relative -mx-2 mb-[6.67px] rounded px-2 ${ring}`} onClick={() => setSelected(b.id)}>
+                  <div key={b.id} data-field={`doc.${b.id}`} className={`relative -mx-2 mb-[6.67px] rounded px-2 ${ring}`} onClick={() => setSelected(b.id)}>
                     {(manual || rt?.autoChanged) && <span className={`absolute -left-3 top-1 h-[calc(100%-8px)] w-[3px] rounded ${rt?.autoChanged ? "bg-warn" : "bg-brand/60"}`} title={rt?.autoChanged ? "Данные оценки изменились после правки" : "Текст изменён оценщиком"} />}
                     {editing ? (
                       <TextArea
@@ -281,7 +318,7 @@ export function ReportTab({ detail, reload, go }: WsProps) {
               const rd = r && r.type === "data" ? r : null;
               const blocks = b.edited?.blocks ?? rd?.auto ?? [];
               return (
-                <div key={b.id} className={`relative -mx-2 mb-2 rounded px-2 pt-1 ${ring}`} onClick={() => setSelected(b.id)}>
+                <div key={b.id} data-field={`doc.${b.id}`} className={`relative -mx-2 mb-2 rounded px-2 pt-1 ${ring}`} onClick={() => setSelected(b.id)}>
                   <div className="mb-1 flex items-center gap-2 font-sans text-[11px] text-muted">
                     <span className="rounded bg-subtle px-1.5 py-0.5">{rd?.label ?? b.key}</span>
                     <span>{b.edited ? "изменено вручную" : "из оценки"}</span>
@@ -406,6 +443,7 @@ export function ReportTab({ detail, reload, go }: WsProps) {
           {versions}
         </div>
       </div>
+      <AckModal req={ack} onClose={() => setAck(null)} />
       <ConfirmModal open={confirmFinal} tone="primary" confirmLabel="Сформировать" title="Сформировать финальную версию?" onClose={() => setConfirmFinal(false)} onConfirm={() => createVersion(true)}>
         Будет подтверждён текущий расчёт (неизменяемый снимок) и сформированы DOCX, PDF и XLSX из одних данных. Последующие изменения оценки не изменят эту версию — для них создаётся новая.
       </ConfirmModal>

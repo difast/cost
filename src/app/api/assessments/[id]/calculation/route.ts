@@ -45,7 +45,7 @@ export const POST = api(async (req, { params }: Params<"id">) => {
   const u = await requireUser();
   const { id } = await params;
   await getOwned(id, u.id);
-  const { note } = await body(req, z.object({ note: z.string().max(500).optional() }));
-  const { version, created } = await commitVersion(id, u.id, note);
+  const { note, acknowledge } = await body(req, z.object({ note: z.string().max(500).optional(), acknowledge: z.boolean().optional() }));
+  const { version, created } = await commitVersion(id, u.id, note, { acknowledge });
   return ok({ id: version.id, versionNumber: version.versionNumber, created });
 });

@@ -81,7 +81,7 @@ function AdjRow({ a, assessmentId, onSaved, unitAfter }: { a: AdjustmentRow; ass
   }
 
   return (
-    <tr className={a.overridden ? "bg-[#fafbfa]" : ""}>
+    <tr data-field={`adjustment.${a.id}`} className={a.overridden ? "bg-[#fafbfa]" : ""}>
       <td className="align-top">
         <div className="font-medium text-ink">{a.factorName}</div>
         <div className="text-[11.5px] text-muted">{a.stage === 1 ? "1-я группа" : "2-я группа"}</div>
@@ -184,7 +184,7 @@ function Matrix({ comps, detail, res }: { comps: ComparableRow[]; detail: WsProp
   );
 }
 
-export function AdjustmentsTab({ detail, reload, calc, checklist, go }: WsProps) {
+export function AdjustmentsTab({ detail, reload, calc, checklist, go, focus }: WsProps) {
   const [editions, setEditions] = useState<Edition[]>([]);
   const [view, setView] = useState<"analog" | "matrix">("analog");
   const comps = detail.comparables.filter((c) => c.included);
@@ -223,6 +223,15 @@ export function AdjustmentsTab({ detail, reload, calc, checklist, go }: WsProps)
     setBusy(false);
   }
 
+  // переход из «Контроля качества» к корректировке: открыть её аналог
+  useEffect(() => {
+    const id = focus?.match(/^adjustment\.([^.]+)/)?.[1];
+    const owner = id ? comps.find((c) => c.adjustments.some((a) => a.id === id)) : null;
+    if (owner) {
+      setView("analog");
+      setCurrent(owner.id);
+    }
+  }, [focus]); // eslint-disable-line react-hooks/exhaustive-deps
   const comp = comps.find((c) => c.id === current);
   const r = comp ? res[comp.id] : undefined;
   const attentionCount = (c: ComparableRow) => c.adjustments.filter((a) => (a.overridden && !a.comment?.trim()) || (a.suggestedValue === null && !a.overridden)).length;

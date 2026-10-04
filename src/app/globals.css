@@ -73,3 +73,10 @@ body { -webkit-font-smoothing: antialiased; font-feature-settings: "cv11" 1, "ss
 /* ── Метки */
 .badge { @apply inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-[1px] text-[11.5px] font-medium leading-[18px]; }
 }
+
+/* Подсветка поля при переходе из «Контроля качества» */
+@keyframes field-flash {
+  0%, 60% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 45%, transparent); background-color: color-mix(in srgb, var(--color-brand) 7%, transparent); }
+  100% { box-shadow: 0 0 0 3px transparent; background-color: transparent; }
+}
+.field-flash { animation: field-flash 2.6s ease-out; }

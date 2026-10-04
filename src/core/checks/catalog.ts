@@ -4,7 +4,7 @@
 
 import type { CheckIssue } from "./index";
 
-export type Step = "assignment" | "property" | "comparables" | "adjustments" | "calculation" | "appraiser";
+export type Step = "assignment" | "property" | "comparables" | "adjustments" | "calculation" | "appraiser" | "report";
 export type ItemStatus = "passed" | "warning" | "error" | "pending";
 
 export interface CatalogItem {
@@ -24,6 +24,7 @@ export const CHECK_CATALOG: CatalogItem[] = [
   { id: "assignment_required", step: "assignment", title: "Задание на оценку заполнено", hint: "Заказчик, договор, цель, вид стоимости, права и даты обязательны для отчёта", codes: ["REQUIRED"], section: "assignment" },
   { id: "dates", step: "assignment", title: "Даты оценки, осмотра и отчёта согласованы", hint: "Дата отчёта не раньше даты оценки, осмотр не позже даты оценки", codes: ["INSPECTION_AFTER_VALUATION", "REPORT_BEFORE_VALUATION", "CONTRACT_DATE"] },
   { id: "property_required", step: "property", title: "Характеристики объекта заполнены", hint: "Адрес, кадастровый номер, площадь, этаж, этажность, комнаты и материал стен", codes: ["REQUIRED", "FLOOR_GT_FLOORS", "LIVING_GT_TOTAL"], section: "property" },
+  { id: "property_features", step: "property", title: "Заполнены характеристики для корректировок", hint: "Отделка, состояние дома, мебель и расстояние до метро нужны для расчёта корректировок", codes: ["OBJECT_FEATURE_MISSING"] },
   { id: "cadastral", step: "property", title: "Кадастровый номер соответствует объекту", hint: "Формат номера и совпадение с выпиской ЕГРН", codes: ["CADASTRAL_FORMAT", "CADASTRAL_MISMATCH"] },
   { id: "area", step: "property", title: "Площадь объекта согласована", hint: "Площадь в карточке, в выписке ЕГРН и в расчёте совпадает", codes: ["AREA_MISMATCH", "AREA_CALC_MISMATCH"] },
   { id: "address_floor", step: "property", title: "Адрес и этаж совпадают с выпиской", hint: "Сверка карточки объекта с загруженной выпиской ЕГРН", codes: ["ADDRESS_MISMATCH", "FLOOR_MISMATCH"] },
@@ -35,7 +36,7 @@ export const CHECK_CATALOG: CatalogItem[] = [
   { id: "comparables_screens", step: "comparables", title: "Скриншоты объявлений приложены", hint: "Скриншоты попадают в приложение к отчёту", codes: ["COMPARABLE_NO_SCREENSHOT"] },
   { id: "comparables_dates", step: "comparables", title: "Предложения актуальны на дату оценки", hint: "Дата предложения не позже даты оценки и не старше шести месяцев", codes: ["COMPARABLE_AFTER_VALUATION", "COMPARABLE_STALE"] },
   { id: "comparables_quality", step: "comparables", title: "Аналоги корректны и не дублируются", hint: "Этаж не больше этажности, нет повторов и самого объекта оценки", codes: ["COMPARABLE_FLOOR", "COMPARABLE_DUPLICATE", "COMPARABLE_IS_SUBJECT", "COMPARABLE_IN_REVIEW"] },
-  { id: "adj_justified", step: "adjustments", title: "Ручные корректировки обоснованы", hint: "Изменение значения справочника требует обоснования", codes: ["ADJ_NO_COMMENT", "ADJ_NO_BASIS", "ADJ_NOT_REQUIRED_NO_REASON", "ADJ_NOT_REQUIRED_VALUE"] },
+  { id: "adj_justified", step: "adjustments", title: "Ручные корректировки обоснованы", hint: "Изменение значения справочника требует обоснования", codes: ["ADJ_NO_COMMENT", "ADJ_NO_BASIS", "ADJ_NO_SOURCE", "ADJ_NOT_REQUIRED_NO_REASON", "ADJ_NOT_REQUIRED_VALUE"] },
   { id: "adj_sign", step: "adjustments", title: "Знак корректировок соответствует сравнению", hint: "Аналог хуже объекта — корректировка положительная, лучше — отрицательная", codes: ["ADJ_SIGN"] },
   { id: "adj_data", step: "adjustments", title: "Корректировки рассчитаны по актуальным характеристикам", hint: "Значения в расчёте совпадают с карточками объекта и аналога; после ручной правки характеристики не менялись", codes: ["ADJ_VALUE_MISMATCH", "ADJ_BASIS_CHANGED", "ADJ_FORMULA_ERROR"] },
   { id: "adj_range", step: "adjustments", title: "Корректировки в пределах справочника", hint: "Значения не выходят за диапазон и рассчитаны по данным", codes: ["ADJ_OUT_OF_RANGE", "ADJ_NOT_DETERMINED", "ADJ_LARGE"] },
@@ -44,6 +45,7 @@ export const CHECK_CATALOG: CatalogItem[] = [
   { id: "weights", step: "calculation", title: "Веса аналогов сходятся", hint: "Сумма весов равна 1, сумма вкладов равна средневзвешенной цене", codes: ["WEIGHTS_SUM", "WEIGHTED_MISMATCH"], needsResult: true },
   { id: "total", step: "calculation", title: "Итог = цена за м² × площадь", hint: "Итоговая стоимость согласована с ценой за м² и площадью", codes: ["TOTAL_MISMATCH", "RAW_MISMATCH"], needsResult: true },
   { id: "sample", step: "calculation", title: "Выборка однородна", hint: "Коэффициент вариации и суммарные корректировки в допустимых пределах", codes: ["CALC_WARNING"], needsResult: true },
+  { id: "report_consistency", step: "report", title: "Отчёт соответствует оценке и расчёту", hint: "Площадь, кадастровый номер, таблицы и итог в документе совпадают с данными оценки", codes: ["REPORT_MISMATCH_AREA", "REPORT_MISMATCH_CADASTRAL", "REPORT_TABLE_OUTDATED", "REPORT_TEXT_OUTDATED", "REPORT_VERSION_OUTDATED"] },
   { id: "dispersion", step: "calculation", title: "Корректировки не увеличивают разброс цен", hint: "Коэффициент вариации скорректированных цен не выше, чем у исходных", codes: ["DISPERSION_GROWTH"], needsResult: true },
 ];
 

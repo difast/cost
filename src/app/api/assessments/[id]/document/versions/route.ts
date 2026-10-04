@@ -11,6 +11,6 @@ export const POST = api(async (req, { params }: Params<"id">) => {
   const u = await requireUser();
   const { id } = await params;
   await getOwned(id, u.id);
-  const data = await body(req, z.object({ final: z.boolean().default(false), note: z.string().max(500).optional() }));
+  const data = await body(req, z.object({ final: z.boolean().default(false), note: z.string().max(500).optional(), acknowledge: z.boolean().optional() }));
   return ok(await createDocumentVersion(id, u.id, data), 201);
 });

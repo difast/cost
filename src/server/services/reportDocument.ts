@@ -12,9 +12,10 @@ import { activeTemplate, loadFiles } from "./report";
 import { storeFile } from "./files";
 import { defaultDocument } from "@/core/document/defaultDocument";
 import { documentToReportDoc, resolveDocument } from "@/core/document/render";
+import { documentConsistency } from "@/core/document/consistency";
 import type { DocContext } from "@/core/document/fields";
 import type { DocStatus, DocumentContent } from "@/core/document/model";
-import { BLOCKED_MESSAGE } from "@/core/calc/quality";
+import { ISSUES_MESSAGE } from "@/core/calc/quality";
 import { runChecks } from "@/core/checks";
 import { renderDocx } from "@/core/report/renderDocx";
 import { renderPdf } from "@/core/report/renderPdf";
@@ -53,11 +54,22 @@ export async function liveContext(assessmentId: string, ownerId: string): Promis
   return { ctx, hash, latestVersion };
 }
 
+/** Добавить к проверкам замечания сверки документа (площадь, кадастровый номер, устаревшие правки). */
+export function withDocIssues(ctx: DocContext, content: DocumentContent): DocContext {
+  const extra = documentConsistency(content, ctx);
+  if (!extra.length) return ctx;
+  const n = (s: string) => extra.filter((i) => i.severity === s).length;
+  return { ...ctx, checks: { ...ctx.checks, issues: [...ctx.checks.issues, ...extra], errors: ctx.checks.errors + n("error"), warnings: ctx.checks.warnings + n("warning") } };
+}
+
 /** Документ для редактора: структура, разрешённые блоки и сведения о статусе и версиях. */
 export async function documentView(assessmentId: string, ownerId: string, withPreview: boolean) {
   const doc = await getDocument(assessmentId);
   const content = doc.content as unknown as DocumentContent;
-  const { ctx, hash, latestVersion } = await liveContext(assessmentId, ownerId);
+  const live = await liveContext(assessmentId, ownerId);
+  const { hash, latestVersion } = live;
+  const ctx = withDocIssues(live.ctx, content);
+  const docIssues = ctx.checks.issues.filter((i) => i.section === "report");
   const versions = await prisma.reportDocumentVersion.findMany({
     where: { assessmentId },
     orderBy: { versionNumber: "desc" },
@@ -71,7 +83,7 @@ export async function documentView(assessmentId: string, ownerId: string, withPr
     updatedAt: doc.updatedAt.toISOString(),
     content,
     sections: resolveDocument(content, ctx),
-    preview: withPreview ? documentToReportDoc(content, ctx) : null,
+    preview: withPreview ? documentToReportDoc(content, ctx, { remarks: true }) : null,
     calc: {
       hasResult: !!ctx.result,
       finalValue: ctx.result?.finalValue ?? null,
@@ -81,6 +93,7 @@ export async function documentView(assessmentId: string, ownerId: string, withPr
       isStale: !latestVersion || latestVersion.inputHash !== hash,
       inputHash: hash,
     },
+    docIssues,
     versions: versions.map((v) => ({
       id: v.id, versionNumber: v.versionNumber, status: v.status, createdAt: v.createdAt.toISOString(), createdBy: v.createdById ? names.get(v.createdById) ?? null : null, note: v.note,
       docxFileId: v.docxFileId, pdfFileId: v.pdfFileId, xlsxFileId: v.xlsxFileId,
@@ -108,11 +121,11 @@ export async function saveDocument(assessmentId: string, userId: string, content
 
 const STATUS_LABEL: Record<string, string> = { draft: "Черновик", review: "На проверке", approved: "Подтверждён", final: "Финальная версия" };
 
-export async function setStatus(assessmentId: string, userId: string, status: "draft" | "review" | "approved") {
+export async function setStatus(assessmentId: string, userId: string, status: "draft" | "review" | "approved", acknowledge = false) {
   const doc = await getDocument(assessmentId);
-  if (status === "approved") {
+  if (status === "approved" && !acknowledge) {
     const { checks } = await evaluate(assessmentId);
-    if (checks.errors > 0) throw new HttpError(422, BLOCKED_MESSAGE, checks.issues.filter((i) => i.severity === "error"));
+    if (checks.errors > 0) throw new HttpError(409, `${ISSUES_MESSAGE} Ошибок: ${checks.errors}. Подтвердите действие, чтобы продолжить с замечаниями.`, { needsAck: true, issues: checks.issues.filter((i) => i.severity === "error") });
   }
   const saved = await prisma.reportDocument.update({ where: { id: doc.id }, data: { status, updatedById: userId } });
   await logEvent({ assessmentId, userId, action: "update", entity: "report_document", entityId: doc.id, summary: `Статус отчёта: ${STATUS_LABEL[doc.status]} → ${STATUS_LABEL[status]}` });
@@ -130,19 +143,20 @@ const safeName = (s: string) => s.replace(/[^\p{L}\p{N}._-]+/gu, "_");
  * Зафиксировать версию отчёта: проверки → подтверждение расчёта (снимок) → документ из снимка →
  * DOCX, PDF и XLSX. final = true — «Сформировать финальную версию» (статус документа «Финальная версия»).
  */
-export async function createDocumentVersion(assessmentId: string, userId: string, opts: { final: boolean; note?: string }) {
+export async function createDocumentVersion(assessmentId: string, userId: string, opts: { final: boolean; note?: string; acknowledge?: boolean }) {
   const pre = await evaluate(assessmentId);
-  if (pre.checks.errors > 0 || !pre.checks.result) throw new HttpError(422, BLOCKED_MESSAGE, pre.checks.issues.filter((i) => i.severity === "error"));
+  // без результата расчёта версию зафиксировать нельзя (нечего фиксировать) — черновик при этом доступен всегда
+  if (!pre.checks.result) throw new HttpError(422, "Расчёт ещё не выполнен — версию с расчётом зафиксировать нельзя. Черновик отчёта можно скачать.", pre.checks.issues.filter((i) => i.severity === "error"));
   const doc = await getDocument(assessmentId);
   const content = doc.content as unknown as DocumentContent;
-  const { version } = await commitVersion(assessmentId, userId);
+  const { version } = await commitVersion(assessmentId, userId, undefined, { acknowledge: opts.acknowledge });
   // Документ строится из зафиксированного снимка, а не из живых данных
   const snapshot = version.snapshot as unknown as AssessmentSnapshot;
   const result = version.result as unknown as CalcResult;
   const checks = runChecks(snapshot, { storedResult: result });
   if (checks.issues.some((i) => i.code === "STORED_RESULT_MISMATCH")) throw new HttpError(409, "Зафиксированный расчёт не воспроизводится текущим ядром", checks.issues);
-  const ctx: DocContext = { snapshot, result, checks, versionNumber: version.versionNumber, files: await loadFiles(snapshot, userId), normative: await normativeList(), generatedAt: new Date().toISOString() };
-  const rendered = documentToReportDoc(content, ctx);
+  const ctx = withDocIssues({ snapshot, result, checks, versionNumber: version.versionNumber, files: await loadFiles(snapshot, userId), normative: await normativeList(), generatedAt: new Date().toISOString() }, content);
+  const rendered = documentToReportDoc(content, ctx, { remarks: true });
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, appraiser: { select: { fullName: true } } } });
 
   const last = await prisma.reportDocumentVersion.aggregate({ where: { assessmentId }, _max: { versionNumber: true } });
@@ -171,7 +185,7 @@ export async function createDocumentVersion(assessmentId: string, userId: string
     await prisma.report.create({
       data: {
         assessmentId, calculationVersionId: version.id, templateId: tpl.id, format: fmt, fileId: stored[fmt]!, documentVersionId: dv.id, createdById: userId,
-        checks: { errors: checks.errors, warnings: checks.warnings, issues: checks.issues } as unknown as Prisma.InputJsonValue,
+        checks: { errors: ctx.checks.errors, warnings: ctx.checks.warnings, issues: ctx.checks.issues } as unknown as Prisma.InputJsonValue,
       },
     });
   }
@@ -181,4 +195,14 @@ export async function createDocumentVersion(assessmentId: string, userId: string
     summary: `${opts.final ? "Сформирована финальная версия" : "Зафиксирована версия"} отчёта № ${versionNumber} (расчёт № ${version.versionNumber}: ${result.finalValue} ₽) — DOCX, PDF, XLSX`,
   });
   return { id: dv.id, versionNumber, status, calculationVersionNumber: version.versionNumber, files: stored };
+}
+
+/** Черновик отчёта по текущим данным (без фиксации версии): доступен всегда, даже при ошибках и без расчёта. */
+export async function draftExport(assessmentId: string, ownerId: string, format: "docx" | "pdf") {
+  const doc = await getDocument(assessmentId);
+  const content = doc.content as unknown as DocumentContent;
+  const ctx = withDocIssues((await liveContext(assessmentId, ownerId)).ctx, content);
+  const rendered = documentToReportDoc(content, ctx, { remarks: true, draft: true });
+  const data = format === "docx" ? await renderDocx(rendered) : await renderPdf(rendered);
+  return { data, filename: `Черновик_отчёта_${ctx.snapshot.assessment.number}.${format}`, mime: MIME[format] };
 }

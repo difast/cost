@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, errorText } from "@/lib/api";
 import { fmtDate, fmtNumber } from "@/core/format";
 import { buildChecklist, type Checklist } from "@/core/checks/catalog";
+import { fieldCandidates } from "@/core/checks/target";
 import { Icon } from "@/components/ui/Icon";
 import { Notice, PageSkeleton, StatusBadge } from "@/components/ui/kit";
 import type { CalcState, Detail } from "./types";
@@ -23,7 +24,7 @@ const STEPS = [
   ["comparables", "Аналоги"],
   ["adjustments", "Корректировки"],
   ["calculation", "Расчёт"],
-  ["checks", "Проверки"],
+  ["checks", "Контроль качества"],
   ["report", "Отчёт"],
 ] as const;
 export type TabKey = (typeof STEPS)[number][0] | "history";
@@ -36,7 +37,30 @@ export interface WsProps {
   calc: CalcState | null;
   checklist: Checklist | null;
   reload: () => Promise<void>;
-  go: (t: TabKey) => void;
+  /** Переход на вкладку; field — подсветить поле (путь data-field) после открытия раздела. */
+  go: (t: TabKey, field?: string) => void;
+  /** Поле, к которому выполняется переход (вкладки раскрывают нужную карточку). */
+  focus: string | null;
+}
+
+/** Найти поле на странице (ждём отрисовку вкладки), прокрутить, подсветить и поставить фокус. */
+function focusField(field: string) {
+  const sels = fieldCandidates(field).map((f) => `[data-field="${CSS.escape(f)}"]`);
+  let tries = 0;
+  const tick = () => {
+    const el = sels.map((s) => document.querySelector<HTMLElement>(s)).find(Boolean);
+    if (!el) {
+      if (++tries < 40) requestAnimationFrame(tick);
+      return;
+    }
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.classList.remove("field-flash");
+    void el.offsetWidth;
+    el.classList.add("field-flash");
+    const input = el.matches("input,select,textarea") ? el : el.querySelector<HTMLElement>("input:not([type=hidden]),select,textarea");
+    input?.focus({ preventScroll: true });
+  };
+  requestAnimationFrame(tick);
 }
 
 function stepStates(detail: Detail, calc: CalcState | null, cl: Checklist | null): Record<string, StepState> {
@@ -72,6 +96,7 @@ export function Workspace({ id }: { id: string }) {
   const [calc, setCalc] = useState<CalcState | null>(null);
   const [tab, setTab] = useState<TabKey>("assignment");
   const [error, setError] = useState<string | null>(null);
+  const [focus, setFocus] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -96,10 +121,12 @@ export function Workspace({ id }: { id: string }) {
 
   const checklist = useMemo(() => (calc ? buildChecklist(calc.issues, !!calc.result) : null), [calc]);
 
-  const go = (t: TabKey) => {
+  const go = (t: TabKey, field?: string) => {
     setTab(t);
+    setFocus(field ?? null);
     history.replaceState(null, "", `#${t}`);
-    window.scrollTo({ top: 0 });
+    if (field) focusField(field);
+    else window.scrollTo({ top: 0 });
   };
 
   if (error) return <Notice tone="err" title="Не удалось открыть оценку">{error}</Notice>;
@@ -107,7 +134,7 @@ export function Workspace({ id }: { id: string }) {
 
   const p = detail.property;
   const states = stepStates(detail, calc, checklist);
-  const props: WsProps = { detail, calc, checklist, reload, go };
+  const props: WsProps = { detail, calc, checklist, reload, go, focus };
   const r = calc?.result;
   const address = (p.address as string) || "Адрес не указан";
 

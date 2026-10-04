@@ -1,6 +1,8 @@
 // Автоматический контроль согласованности оценки.
-// Ошибки (error) блокируют формирование отчёта, предупреждения (warning) — нет.
+// Проверки только информируют оценщика: ни ошибка, ни предупреждение не закрывают доступ к отчёту.
+// Уровни: error — критично / требует заполнения, warning — требует внимания, info — к сведению.
 
+import { comparisonOfAdjustment, signMatches } from "../adjustments/sign";
 import { d, round } from "../calc/decimal";
 import { calculate, CalcError } from "../calc/engine";
 import { calcQuality, DISPERSION_MESSAGE } from "../calc/quality";
@@ -21,7 +23,6 @@ export function canonicalJson(v: unknown): string {
   return `{${Object.keys(o).filter((k) => o[k] !== undefined).sort().map((k) => `${JSON.stringify(k)}:${canonicalJson(o[k])}`).join(",")}}`;
 }
 
-const signOf = (v: string) => (d(v).isZero() ? 0 : d(v).isNeg() ? -1 : 1);
 
 function comparableFeaturesOf(c: SnapshotComparable): ObjectFeatures {
   return {
@@ -35,7 +36,7 @@ export type Severity = "error" | "warning" | "info";
 export interface CheckIssue {
   code: string;
   severity: Severity;
-  section: "assignment" | "property" | "appraiser" | "comparables" | "adjustments" | "calculation" | "text";
+  section: "assignment" | "property" | "appraiser" | "comparables" | "adjustments" | "calculation" | "text" | "report";
   message: string;
   /** Путь к полю для перехода из интерфейса. */
   field?: string;
@@ -44,7 +45,7 @@ export interface CheckIssue {
 export const CADASTRAL_RE = /\b\d{2}:\d{2}:\d{6,7}:\d{1,6}\b/g;
 const CADASTRAL_STRICT = /^\d{2}:\d{2}:\d{6,7}:\d{1,6}$/;
 const DATE_RE = /\b(\d{2})\.(\d{2})\.(\d{4})\b/g;
-const AREA_RE = /(\d{1,4}(?:[.,]\d{1,2})?)\s*(?:кв\.?\s*м|м²|м2)/gi;
+export const AREA_RE = /(\d{1,4}(?:[.,]\d{1,2})?)\s*(?:кв\.?\s*м|м²|м2)/gi;
 
 /** Входные данные расчёта из снимка (только включённые аналоги). */
 export function calcInputFromSnapshot(s: AssessmentSnapshot): CalcInput {
@@ -83,7 +84,7 @@ function normalizeAddress(a: string): string {
 
 function requireField(issues: CheckIssue[], value: unknown, section: CheckIssue["section"], field: string, label: string) {
   if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) {
-    issues.push({ code: "REQUIRED", severity: "error", section, field, message: `Не заполнено обязательное поле: ${label}` });
+    issues.push({ code: "REQUIRED", severity: "error", section, field, message: `Не заполнено поле «${label}»` });
   }
 }
 
@@ -130,6 +131,20 @@ export function runChecks(s: AssessmentSnapshot, opts: CheckOptions = {}): Check
   requireField(issues, p.rooms, "property", "rooms", "Количество комнат");
   requireField(issues, s.building.wallMaterial, "property", "building.wallMaterial", "Материал стен");
 
+  requireField(issues, p.objectType, "property", "objectType", "Вид объекта");
+  // характеристики, по которым считаются корректировки: без них корректировка не определяется
+  const used: Array<[unknown, string, string]> = [
+    [p.finishing, "finishing", "Отделка"],
+    [s.building.houseCondition, "building.houseCondition", "Техническое состояние дома"],
+    [p.furniture, "furniture", "Мебель"],
+    [p.metroDistanceM, "metroDistanceM", "Расстояние до метро"],
+  ];
+  for (const [v, field, label] of used) {
+    if (v === null || v === undefined || v === "") {
+      issues.push({ code: "OBJECT_FEATURE_MISSING", severity: "warning", section: "property", field, message: `Не заполнена характеристика «${label}», используемая в корректировках — корректировка по ней не будет рассчитана` });
+    }
+  }
+
   if (p.cadastralNumber && !CADASTRAL_STRICT.test(p.cadastralNumber.trim())) {
     issues.push({ code: "CADASTRAL_FORMAT", severity: "error", section: "property", field: "cadastralNumber", message: `Некорректный формат кадастрового номера: ${p.cadastralNumber}` });
   }
@@ -148,7 +163,7 @@ export function runChecks(s: AssessmentSnapshot, opts: CheckOptions = {}): Check
       issues.push({ code: "CADASTRAL_MISMATCH", severity: "error", section: "property", field: "cadastralNumber", message: `Кадастровый номер ${p.cadastralNumber} не совпадает с источником «${label}»: ${ex.cadastralNumber}` });
     }
     if (ex.area !== undefined && ex.area !== null && p.area && !d(String(ex.area)).eq(d(p.area))) {
-      issues.push({ code: "AREA_MISMATCH", severity: "error", section: "property", field: "area", message: `Площадь ${fmtNumber(p.area)} м² не совпадает с источником «${label}»: ${fmtNumber(String(ex.area))} м²` });
+      issues.push({ code: "AREA_MISMATCH", severity: "error", section: "property", field: "area", message: `Обнаружено расхождение площади. Проверьте исходные данные: в карточке объекта ${fmtNumber(p.area)} м², в источнике «${label}» — ${fmtNumber(String(ex.area))} м²` });
     }
     if (typeof ex.address === "string" && p.address && normalizeAddress(ex.address) !== normalizeAddress(p.address)) {
       issues.push({ code: "ADDRESS_MISMATCH", severity: "warning", section: "property", field: "address", message: `Адрес объекта отличается от адреса в источнике «${label}»: «${ex.address}»` });
@@ -271,8 +286,8 @@ export function runChecks(s: AssessmentSnapshot, opts: CheckOptions = {}): Check
         continue;
       }
       // Знак: аналог хуже объекта (по справочнику корректировка > 0) — применённая не может быть отрицательной, и наоборот
-      if (adj.suggestedValue !== null && signOf(adj.suggestedValue) !== 0 && signOf(adj.value) !== 0 && signOf(adj.value) !== signOf(adj.suggestedValue)) {
-        const worse = signOf(adj.suggestedValue) > 0;
+      if (adj.suggestedValue !== null && !signMatches(adj.value, comparisonOfAdjustment(adj.suggestedValue))) {
+        const worse = comparisonOfAdjustment(adj.suggestedValue) === "analog_worse";
         issues.push({ code: "ADJ_SIGN", severity: "error", section: "adjustments", field: `adjustment.${adj.id}`, message: `${name}: аналог ${worse ? "хуже" : "лучше"} объекта (по справочнику ${fmtPercent(adj.suggestedValue, 2, true)}), а применена ${worse ? "отрицательная" : "положительная"} корректировка ${fmtPercent(adj.value, 2, true)}` });
       }
       // Характеристики изменились после ручного изменения значения
@@ -296,6 +311,10 @@ export function runChecks(s: AssessmentSnapshot, opts: CheckOptions = {}): Check
       }
       if (adj.minValue === null && adj.maxValue === null && d(adj.value).abs().gt(SINGLE_ADJUSTMENT_WARN)) {
         issues.push({ code: "ADJ_LARGE", severity: "warning", section: "adjustments", message: `${name}: корректировка ${fmtPercent(adj.value, 2, true)} превышает ${fmtPercent(SINGLE_ADJUSTMENT_WARN, 0)} по модулю — проверьте сопоставимость аналога` });
+      }
+      const rsSrc = (adj.ruleSnapshot as { sourceName?: string } | null)?.sourceName;
+      if (!rsSrc && !adj.overridden && !d(adj.value).isZero()) {
+        issues.push({ code: "ADJ_NO_SOURCE", severity: "warning", section: "adjustments", field: `adjustment.${adj.id}`, message: `${name}: у корректировки ${fmtPercent(adj.value, 2, true)} не указан источник — укажите обоснование` });
       }
       if (adj.overridden && !adj.comment?.trim()) {
         issues.push({ code: "ADJ_NO_COMMENT", severity: "error", section: "adjustments", field: `adjustment.${adj.id}`, message: `${name}: значение изменено вручную без обоснования` });
@@ -325,37 +344,37 @@ export function runChecks(s: AssessmentSnapshot, opts: CheckOptions = {}): Check
   }
 
   // 8. Остатки текста от другого объекта: чужие кадастровые номера, даты, площади в свободном тексте
-  const texts: Array<[string, string | null]> = [
-    ["Допущения", a.assumptions],
-    ["Ограничения", a.limitingConditions],
-    ["Описание объекта", p.description],
-    ["Описание здания", s.building.description],
-    ["Обременения", p.encumbrances],
-    ["Основание", a.basis],
-    ["Цель оценки", a.purpose],
-    ["Предполагаемое использование", a.intendedUse],
+  const texts: Array<[string, string | null, string]> = [
+    ["Допущения", a.assumptions, "assumptions"],
+    ["Ограничения", a.limitingConditions, "limitingConditions"],
+    ["Описание объекта", p.description, "description"],
+    ["Описание здания", s.building.description, "building.description"],
+    ["Обременения", p.encumbrances, "encumbrances"],
+    ["Основание", a.basis, "basis"],
+    ["Цель оценки", a.purpose, "purpose"],
+    ["Предполагаемое использование", a.intendedUse, "intendedUse"],
   ];
   const allowedCad = new Set([p.cadastralNumber?.trim(), s.building.cadastralNumber?.trim()].filter(Boolean) as string[]);
   const allowedDates = new Set(
     [a.valuationDate, a.inspectionDate, a.reportDate, a.contractDate].filter(Boolean).map((x) => fmtDate(x)),
   );
-  for (const [label, text] of texts) {
+  for (const [label, text, textField] of texts) {
     if (!text) continue;
     for (const m of text.matchAll(CADASTRAL_RE)) {
       if (!allowedCad.has(m[0])) {
-        issues.push({ code: "TEXT_FOREIGN_CADASTRAL", severity: "error", section: "text", message: `«${label}»: упомянут кадастровый номер ${m[0]}, не совпадающий с объектом оценки — возможно, остаток текста другого отчёта` });
+        issues.push({ code: "TEXT_FOREIGN_CADASTRAL", severity: "error", section: "text", field: textField, message: `«${label}»: упомянут кадастровый номер ${m[0]}, не совпадающий с объектом оценки — возможно, остаток текста другого отчёта` });
       }
     }
     for (const m of text.matchAll(/дат[аеуы]\s+оценки[^0-9]{0,40}(\d{2}\.\d{2}\.\d{4})/gi)) {
       if (a.valuationDate && m[1] !== fmtDate(a.valuationDate)) {
-        issues.push({ code: "TEXT_FOREIGN_VALUATION_DATE", severity: "error", section: "text", message: `«${label}»: указана дата оценки ${m[1]}, а в задании — ${fmtDate(a.valuationDate)}` });
+        issues.push({ code: "TEXT_FOREIGN_VALUATION_DATE", severity: "error", section: "text", field: textField, message: `«${label}»: указана дата оценки ${m[1]}, а в задании — ${fmtDate(a.valuationDate)}` });
       }
     }
     for (const m of text.matchAll(DATE_RE)) {
       const y = Number(m[3]);
       const vy = a.valuationDate ? new Date(a.valuationDate).getUTCFullYear() : null;
       if (vy && Math.abs(y - vy) >= 2 && !allowedDates.has(m[0])) {
-        issues.push({ code: "TEXT_SUSPICIOUS_DATE", severity: "warning", section: "text", message: `«${label}»: дата ${m[0]} далека от даты оценки — проверьте актуальность текста` });
+        issues.push({ code: "TEXT_SUSPICIOUS_DATE", severity: "warning", section: "text", field: textField, message: `«${label}»: дата ${m[0]} далека от даты оценки — проверьте актуальность текста` });
       }
     }
     if (label.startsWith("Описание объекта") || label === "Допущения") {
@@ -363,7 +382,7 @@ export function runChecks(s: AssessmentSnapshot, opts: CheckOptions = {}): Check
         const val = m[1].replace(",", ".");
         const known = [p.area, p.livingArea, p.kitchenArea].filter(Boolean).map((x) => d(x!).toString());
         if (p.area && !known.includes(d(val).toString())) {
-          issues.push({ code: "TEXT_FOREIGN_AREA", severity: "warning", section: "text", message: `«${label}»: указана площадь ${m[1]} м², не совпадающая с площадями объекта` });
+          issues.push({ code: "TEXT_FOREIGN_AREA", severity: "warning", section: "text", field: textField, message: `«${label}»: указана площадь ${m[1]} м², не совпадающая с площадями объекта` });
         }
       }
     }

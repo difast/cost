@@ -10,24 +10,9 @@ import { api } from "@/lib/api";
 import { fmtNumber } from "@/core/format";
 import { fmtDistance } from "@/core/infrastructure";
 
-export type MapPointKind = "subject" | "comparable" | "found" | "infra";
-
-export interface MapPoint {
-  id: string;
-  kind: MapPointKind;
-  lat: number;
-  lon: number;
-  title: string;
-  /** Короткая подпись на метке (номер аналога). */
-  caption?: string;
-  lines: string[];
-  /** Для аналогов: use | review | exclude. */
-  status?: string | null;
-  /** Для инфраструктуры: категория. */
-  category?: string;
-  categoryLabel?: string;
-  source?: string;
-}
+import type { MapPoint, MapPointKind } from "./mapPoints";
+export type { MapPoint, MapPointKind } from "./mapPoints";
+export { subjectPoint } from "./mapPoints";
 
 const INFRA_GLYPH: Record<string, string> = { metro: "М", transport: "О", school: "Ш", kindergarten: "С", polyclinic: "П", hospital: "Б", pharmacy: "А", shop: "Т" };
 const COLORS = { subject: "#171a19", use: "#176b4d", review: "#b7791f", exclude: "#9aa39e", found: "#7b8580", infra: "#4f5a55" };
@@ -91,7 +76,7 @@ export interface EnvironmentMapProps {
 }
 
 export function EnvironmentMap({ points, selectedId, onSelect, height = 420, layers = ["comparables", "found", "infra"], emptyText }: EnvironmentMapProps) {
-  const [show, setShow] = useState({ comparables: true, found: true, infra: true });
+  const [show, setShow] = useState({ subject: true, comparables: true, found: true, infra: true });
   const [mode, setMode] = useState<"loading" | "yandex" | "scheme">("loading");
   const [why, setWhy] = useState<string | null>(null);
   const [popup, setPopup] = useState<MapPoint | null>(null);
@@ -101,7 +86,7 @@ export function EnvironmentMap({ points, selectedId, onSelect, height = 420, lay
   onSelectRef.current = onSelect;
 
   const visible = useMemo(
-    () => points.filter((p) => p.kind === "subject" || (p.kind === "comparable" && show.comparables) || (p.kind === "found" && show.found) || (p.kind === "infra" && show.infra)),
+    () => points.filter((p) => (p.kind === "subject" && show.subject) || (p.kind === "comparable" && show.comparables) || (p.kind === "found" && show.found) || (p.kind === "infra" && show.infra)),
     [points, show],
   );
 
@@ -155,8 +140,12 @@ export function EnvironmentMap({ points, selectedId, onSelect, height = 420, lay
       else m.map.geoObjects.add(pm);
     }
     m.map.geoObjects.add(clusterer);
-    const b = m.map.geoObjects.getBounds();
-    if (b) m.map.setBounds(b, { checkZoomRange: true, zoomMargin: 40 });
+    // одна точка (обычно только объект) — центрируем с уличным масштабом, иначе вписываем все метки
+    if (visible.length === 1) m.map.setCenter([visible[0].lat, visible[0].lon], 16);
+    else {
+      const b = m.map.geoObjects.getBounds();
+      if (b) m.map.setBounds(b, { checkZoomRange: true, zoomMargin: 40 });
+    }
   }, [visible, mode]);
 
   // выбор из списка → подсветка метки
@@ -181,15 +170,19 @@ export function EnvironmentMap({ points, selectedId, onSelect, height = 420, lay
   return (
     <div className="min-w-0">
       <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[12px]">
+        <LayerToggle on={show.subject} onClick={() => setShow({ ...show, subject: !show.subject })} color={COLORS.subject} label={hasSubject ? "Объект" : "Объект · нет координат"} />
         {layers.includes("comparables") && <LayerToggle on={show.comparables} onClick={() => setShow({ ...show, comparables: !show.comparables })} color={COLORS.use} label={`Аналоги в оценке · ${counts.comparables}`} />}
         {layers.includes("found") && <LayerToggle on={show.found} onClick={() => setShow({ ...show, found: !show.found })} color={COLORS.found} label={`Найденные · ${counts.found}`} hollow />}
         {layers.includes("infra") && <LayerToggle on={show.infra} onClick={() => setShow({ ...show, infra: !show.infra })} color={COLORS.infra} label={`Инфраструктура · ${counts.infra}`} />}
       </div>
       <div className="relative overflow-hidden rounded-md border border-line bg-[#eef1ef]" style={{ height }}>
         <div ref={el} className={`absolute inset-0 ${mode === "yandex" ? "" : "invisible"}`} />
-        {mode === "loading" && <div className="absolute inset-0 flex items-center justify-center text-[12.5px] text-muted">Загрузка карты…</div>}
+        {mode === "loading" && (hasSubject || visible.length > 0) && <div className="absolute inset-0 flex items-center justify-center text-[12.5px] text-muted">Загрузка карты…</div>}
         {mode === "scheme" && (hasSubject || visible.length > 0 ? <Scheme points={visible} selectedId={selectedId ?? null} onSelect={(p) => onSelect?.(p)} height={height} /> : <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-[12.5px] text-muted">{emptyText ?? "Нет координат для отображения"}</div>)}
         {mode === "scheme" && popup && <Popup p={popup} onClose={() => setPopup(null)} />}
+        {mode !== "scheme" && !hasSubject && visible.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/75 px-6 text-center text-[12.5px] text-zinc-700">{emptyText ?? "Нет координат для отображения"}</div>
+        )}
       </div>
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-muted">
         <Legend color={COLORS.subject} square label="Объект оценки" />

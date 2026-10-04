@@ -7,6 +7,7 @@ import { logEvent } from "@/server/audit";
 import { getOwned, syncAdjustments, updateWithAudit } from "@/server/services/assessment";
 import { geocode, reverseGeocode } from "@/server/integrations/yandex";
 import { collectInfrastructure } from "@/server/services/infrastructure";
+import { PRECISION, selectAddress } from "@/server/services/location";
 
 const lat = z.coerce.number().min(-90, "Широта от −90 до 90").max(90, "Широта от −90 до 90");
 const lon = z.coerce.number().min(-180, "Долгота от −180 до 180").max(180, "Долгота от −180 до 180");
@@ -15,9 +16,17 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("geocode"), address: z.string().trim().min(3, "Укажите адрес").max(500) }),
   z.object({ action: z.literal("reverse"), lat, lon }),
   z.object({ action: z.literal("infrastructure") }),
+  z.object({
+    action: z.literal("select"),
+    suggestion: z.object({
+      id: z.string().max(200), source: z.enum(["gar", "yandex"]), fullAddress: z.string().trim().min(3).max(500),
+      region: z.string().max(200).nullable(), municipality: z.string().max(200).nullable(), locality: z.string().max(200).nullable(), district: z.string().max(200).nullable(),
+      street: z.string().max(200).nullable(), house: z.string().max(100).nullable(), guid: z.string().max(64).nullable(), objectId: z.string().max(32).nullable(),
+      lat: lat.nullable(), lon: lon.nullable(), precision: z.string().max(20).nullable(),
+    }),
+  }),
 ]);
 
-const PRECISION: Record<string, string> = { exact: "точное совпадение", number: "дом найден, корпус не совпал", near: "ближайший дом", range: "по диапазону номеров", street: "только улица", other: "неточное совпадение" };
 
 export const POST = api(async (req, { params }: Params<"id">) => {
   const u = await requireUser();
@@ -30,6 +39,8 @@ export const POST = api(async (req, { params }: Params<"id">) => {
     if (!r) throw new HttpError(404, "По этим координатам адрес не найден");
     return ok({ address: r.formatted, kind: r.kind });
   }
+
+  if (data.action === "select") return ok(await selectAddress(id, u.id, data.suggestion));
 
   const before = await prisma.property.findUniqueOrThrow({ where: { assessmentId: id } });
 

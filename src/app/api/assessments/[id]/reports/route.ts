@@ -21,7 +21,7 @@ export const POST = api(async (req, { params }: Params<"id">) => {
   // Новый отчёт — только через рабочий документ (единый источник для DOCX, PDF и XLSX);
   // по старой версии расчёта — повторное формирование по шаблону той версии.
   if (data.versionId) return ok(await regenerateFromVersion(id, data.versionId, u.id, data.formats), 201);
-  const v = await createDocumentVersion(id, u.id, { final: true });
+  const v = await createDocumentVersion(id, u.id, { final: true, acknowledge: true });
   const reports = await prisma.report.findMany({ where: { documentVersionId: v.id }, orderBy: { createdAt: "asc" } });
   return ok(reports.filter((r) => (data.formats as string[]).includes(r.format) || r.format === "xlsx"), 201);
 });

@@ -12,7 +12,7 @@ import { buildChecklist } from "@/core/checks/catalog";
 import { suggestForComparable, type DirectoryEdition } from "@/core/adjustments/suggest";
 import type { AssessmentSnapshot, SnapshotAdjustment } from "@/core/snapshot";
 import type { InfrastructureSnapshot } from "@/core/infrastructure";
-import { BLOCKED_MESSAGE } from "@/core/calc/quality";
+import { ISSUES_MESSAGE } from "@/core/calc/quality";
 import type { ObjectFeatures } from "@/core/adjustments/attributes";
 import { distanceM, toPoint } from "@/core/geo";
 import { d } from "@/core/calc/decimal";
@@ -477,11 +477,14 @@ export async function evaluate(assessmentId: string): Promise<{ snapshot: Assess
 }
 
 /** Зафиксировать версию расчёта (если входные данные изменились). */
-export async function commitVersion(assessmentId: string, userId: string, note?: string) {
+export async function commitVersion(assessmentId: string, userId: string, note?: string, opts: { acknowledge?: boolean } = {}) {
   const { snapshot, checks, hash, latestVersion } = await evaluate(assessmentId);
   if (!checks.result) throw new HttpError(422, "Расчёт невозможен — устраните ошибки", checks.issues);
-  // критические ошибки блокируют подтверждение; предупреждения — нет
-  if (checks.errors > 0) throw new HttpError(422, BLOCKED_MESSAGE, checks.issues.filter((i) => i.severity === "error"));
+  // проверки не блокируют: при ошибках нужно явное подтверждение оценщика, замечания записываются в версию
+  if (checks.errors > 0 && !opts.acknowledge) {
+    throw new HttpError(409, `${ISSUES_MESSAGE} Ошибок: ${checks.errors}. Подтвердите действие, чтобы продолжить с замечаниями.`, { needsAck: true, issues: checks.issues.filter((i) => i.severity === "error") });
+  }
+  if (checks.errors > 0) note = [note, `подтверждено с замечаниями: ошибок ${checks.errors}, предупреждений ${checks.warnings}`].filter(Boolean).join("; ");
   if (latestVersion && latestVersion.inputHash === hash) {
     return { version: await prisma.calculationVersion.findUniqueOrThrow({ where: { id: latestVersion.id } }), created: false, checks, snapshot };
   }

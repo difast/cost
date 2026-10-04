@@ -76,6 +76,8 @@ export interface ListingQuery {
   district?: string | null;
   /** Поиск по адресу/тексту. */
   q?: string | null;
+  /** Улица объекта (уровень 1 каскада; передаётся поставщику как текстовый поиск). */
+  street?: string | null;
   /** Центр и радиус — фильтрация по расстоянию выполняется на нашей стороне по координатам объявления. */
   center?: { lat: number; lon: number } | null;
   radiusM?: number | null;

@@ -67,10 +67,10 @@ export function ListingSearchPanel({ q, setQ, busy, onSearch, onReset }: { q: Qu
       }}
     >
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        {text("locality", "Населённый пункт", "Москва")}
+        {text("locality", "Город (уровень 1)", "Москва")}
+        {text("street", "Улица (уровень 1)", "Тверская")}
         {text("region", "Регион", "Московская область")}
-        {text("district", "Район", "")}
-        {text("q", "Адрес / текст", "улица")}
+        {text("q", "Текст в объявлении", "")}
         <div>
           <label className="label">Расстояние от объекта</label>
           <select className="input py-1.5" value={q.radiusM ? String(q.radiusM) : ""} disabled={!q.center} onChange={(e) => set("radiusM", e.target.value ? Number(e.target.value) : null)} title={q.center ? undefined : "Нет координат объекта"}>
@@ -78,6 +78,7 @@ export function ListingSearchPanel({ q, setQ, busy, onSearch, onReset }: { q: Qu
           </select>
         </div>
       </div>
+      <p className="text-[11.5px] leading-snug text-muted">Поиск каскадный: уровень 1 — город и улица; уровень 2 — квартира, комнаты, площадь; уровень 3 — этаж, этажность, материал, отделка, расстояние. Если подходящих объектов мало, условия ослабляются автоматически (3 → улица → 2), и это показывается под формой. Пустые значения в объявлениях условиям не противоречат.</p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,1fr))]">
         <div>
           <label className="label">Комнат</label>

@@ -12,7 +12,8 @@ import type { InfrastructureSnapshot } from "@/core/infrastructure";
 import { NextStep, StepIssues } from "./common";
 import { InfrastructurePanel, mapUrl } from "./InfrastructurePanel";
 import { AddressInput } from "./AddressInput";
-import { EnvironmentMap, infraPoints, type MapPoint } from "./EnvironmentMap";
+import type { AddressDetails, AddressSuggestion } from "@/core/address";
+import { EnvironmentMap, infraPoints, subjectPoint, type MapPoint } from "./EnvironmentMap";
 import { STATUS_LABEL } from "./ComparableCard";
 import type { WsProps } from "./Workspace";
 import type { Provenance } from "./types";
@@ -30,7 +31,7 @@ export function PropertyTab({ detail, reload, checklist, go }: WsProps) {
   const [egrn, setEgrn] = useState<{ tone: "ok" | "err" | "info"; text: string } | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
   const [geoBusy, setGeoBusy] = useState<"geocode" | "reverse" | "infra" | null>(null);
-  const [geoMsg, setGeoMsg] = useState<{ tone: "ok" | "err" | "info"; text: string; address?: string } | null>(null);
+  const [geoMsg, setGeoMsg] = useState<{ tone: "ok" | "err" | "info"; text: string; address?: string; top?: boolean } | null>(null);
   const egrnRef = useRef<HTMLInputElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
   const docRef = useRef<HTMLInputElement>(null);
@@ -40,7 +41,7 @@ export function PropertyTab({ detail, reload, checklist, go }: WsProps) {
   const src = (prov: Provenance, k: string) => <SourceTag source={prov?.[k]?.source} title={prov?.[k]?.title} at={prov?.[k]?.at} />;
 
   const persist = () =>
-    api.put(`/api/assessments/${detail.id}/property`, {
+    api.put<{ ok: boolean; geocode: { updated: boolean; warning: string | null } | null }>(`/api/assessments/${detail.id}/property`, {
       ...(prop.dirty ? { property: prop.changes } : {}),
       ...(bld.dirty ? { building: bld.changes } : {}),
     });
@@ -49,13 +50,38 @@ export function PropertyTab({ detail, reload, checklist, go }: WsProps) {
     setBusy(true);
     setError(null);
     try {
-      await persist();
+      const r = await persist();
       toast("Данные объекта сохранены");
+      if (r.geocode?.updated) setGeoMsg({ tone: "ok", text: "Адрес изменён — координаты объекта определены заново.", top: true });
+      else if (r.geocode?.warning) setGeoMsg({ tone: "info", text: r.geocode.warning, top: true });
       await reload();
     } catch (e) {
       setError(errorText(e));
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** Выбор подсказки: сервер сохраняет адрес, ГАР-идентификаторы, разобранный адрес и координаты. */
+  async function pickAddress(sg: AddressSuggestion) {
+    sP("address", sg.fullAddress);
+    setGeoBusy("geocode");
+    setGeoMsg(null);
+    try {
+      const { address: _a, fiasId: _f, ...rest } = prop.changes;
+      void _a; void _f;
+      if (Object.keys(rest).length || bld.dirty) {
+        await api.put(`/api/assessments/${detail.id}/property`, { ...(Object.keys(rest).length ? { property: rest } : {}), ...(bld.dirty ? { building: bld.changes } : {}) });
+      }
+      const r = await api.post<{ lat: number | null; lon: number | null; precisionLabel: string | null; warning: string | null }>(`/api/assessments/${detail.id}/location`, { action: "select", suggestion: sg });
+      setGeoMsg(r.lat !== null && r.lon !== null
+        ? { tone: "ok", top: true, text: `Адрес сохранён (${sg.source === "gar" ? "ГАР" : "Яндекс Геокодер"}), координаты: ${r.lat.toFixed(6)}, ${r.lon.toFixed(6)}${r.precisionLabel ? ` — ${r.precisionLabel}` : ""}.` }
+        : { tone: "info", top: true, text: r.warning ?? "Адрес сохранён, координаты не определены." });
+      await reload();
+    } catch (e) {
+      setGeoMsg({ tone: "err", text: errorText(e), top: true });
+    } finally {
+      setGeoBusy(null);
     }
   }
 
@@ -129,9 +155,7 @@ export function PropertyTab({ detail, reload, checklist, go }: WsProps) {
   }
 
   const envPoints: MapPoint[] = [
-    ...(detail.property.latitude != null && detail.property.longitude != null
-      ? [{ id: "subject", kind: "subject" as const, lat: Number(detail.property.latitude), lon: Number(detail.property.longitude), title: "Объект оценки", lines: [String(detail.property.address ?? "")] }]
-      : []),
+    ...[subjectPoint(detail.property.latitude, detail.property.longitude, detail.property.address)].filter((x): x is MapPoint => !!x),
     ...detail.comparables
       .filter((c) => c.latitude != null && c.longitude != null)
       .map((c) => ({
@@ -153,61 +177,61 @@ export function PropertyTab({ detail, reload, checklist, go }: WsProps) {
         <div className="space-y-4">
           <Panel title="Основные характеристики">
             <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Field label="Адрес" required className="sm:col-span-2 lg:col-span-3" source={src(pv, "address")}><AddressInput value={String(P.address ?? "")} onChange={(v) => sP("address", v)} onPick={(h) => { sP("address", h.fullAddress); sP("fiasId", h.guid); }} /></Field>
-              <Field label="Вид объекта"><TextInput d={P} k="objectType" set={sP} /></Field>
-              <Field label="Кадастровый номер" required source={src(pv, "cadastralNumber")}><TextInput d={P} k="cadastralNumber" set={sP} placeholder="77:01:0001001:1234" /></Field>
-              <Field label="Общая площадь" required source={src(pv, "area")}><NumInput d={P} k="area" set={sP} suffix="м²" /></Field>
-              <Field label="Жилая площадь"><NumInput d={P} k="livingArea" set={sP} suffix="м²" /></Field>
-              <Field label="Площадь кухни"><NumInput d={P} k="kitchenArea" set={sP} suffix="м²" /></Field>
-              <Field label="Комнат" required><NumInput d={P} k="rooms" set={sP} /></Field>
-              <Field label="Этаж" required source={src(pv, "floor")}><NumInput d={P} k="floor" set={sP} /></Field>
-              <Field label="Этажность дома" required source={src(bv, "floors")}><NumInput d={B} k="floors" set={sB} /></Field>
-              <Field label="Назначение" source={src(pv, "purpose")}><TextInput d={P} k="purpose" set={sP} /></Field>
-              <Field label="Материал стен" required source={src(bv, "wallMaterial")}><Select d={B} k="wallMaterial" set={sB} options={WALL_OPTIONS} /></Field>
-              <Field label="Год постройки" source={src(bv, "yearBuilt")}><NumInput d={B} k="yearBuilt" set={sB} /></Field>
-              <Field label="Высота потолков"><NumInput d={P} k="ceilingHeight" set={sP} suffix="м" /></Field>
+              <Field field="address" label="Адрес" required className="sm:col-span-2 lg:col-span-3" source={src(pv, "address")}><AddressInput value={String(P.address ?? "")} onChange={(v) => sP("address", v)} onPick={pickAddress} /></Field>
+              <Field field="objectType" label="Вид объекта"><TextInput d={P} k="objectType" set={sP} /></Field>
+              <Field field="cadastralNumber" label="Кадастровый номер" required source={src(pv, "cadastralNumber")}><TextInput d={P} k="cadastralNumber" set={sP} placeholder="77:01:0001001:1234" /></Field>
+              <Field field="area" label="Общая площадь" required source={src(pv, "area")}><NumInput d={P} k="area" set={sP} suffix="м²" /></Field>
+              <Field field="livingArea" label="Жилая площадь"><NumInput d={P} k="livingArea" set={sP} suffix="м²" /></Field>
+              <Field field="kitchenArea" label="Площадь кухни"><NumInput d={P} k="kitchenArea" set={sP} suffix="м²" /></Field>
+              <Field field="rooms" label="Комнат" required><NumInput d={P} k="rooms" set={sP} /></Field>
+              <Field field="floor" label="Этаж" required source={src(pv, "floor")}><NumInput d={P} k="floor" set={sP} /></Field>
+              <Field field="building.floors" label="Этажность дома" required source={src(bv, "floors")}><NumInput d={B} k="floors" set={sB} /></Field>
+              <Field field="purpose" label="Назначение" source={src(pv, "purpose")}><TextInput d={P} k="purpose" set={sP} /></Field>
+              <Field field="building.wallMaterial" label="Материал стен" required source={src(bv, "wallMaterial")}><Select d={B} k="wallMaterial" set={sB} options={WALL_OPTIONS} /></Field>
+              <Field field="building.yearBuilt" label="Год постройки" source={src(bv, "yearBuilt")}><NumInput d={B} k="yearBuilt" set={sB} /></Field>
+              <Field field="ceilingHeight" label="Высота потолков"><NumInput d={P} k="ceilingHeight" set={sP} suffix="м" /></Field>
             </div>
           </Panel>
 
           <Panel title="Состояние и отделка">
             <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Field label="Отделка"><Select d={P} k="finishing" set={sP} options={FINISHING_OPTIONS} /></Field>
-              <Field label="Мебель"><TriState d={P} k="furniture" set={sP} yes="С мебелью" no="Без мебели" /></Field>
-              <Field label="Состояние квартиры"><TextInput d={P} k="condition" set={sP} /></Field>
-              <Field label="Санузел"><TextInput d={P} k="bathroom" set={sP} /></Field>
-              <Field label="Балкон / лоджия"><TextInput d={P} k="balcony" set={sP} /></Field>
-              <Field label="Коммуникации" className="sm:col-span-2 lg:col-span-3"><TextInput d={P} k="communications" set={sP} /></Field>
-              <Field label="Описание объекта" className="sm:col-span-2 lg:col-span-4"><TextArea d={P} k="description" set={sP} rows={3} /></Field>
+              <Field field="finishing" label="Отделка"><Select d={P} k="finishing" set={sP} options={FINISHING_OPTIONS} /></Field>
+              <Field field="furniture" label="Мебель"><TriState d={P} k="furniture" set={sP} yes="С мебелью" no="Без мебели" /></Field>
+              <Field field="condition" label="Состояние квартиры"><TextInput d={P} k="condition" set={sP} /></Field>
+              <Field field="bathroom" label="Санузел"><TextInput d={P} k="bathroom" set={sP} /></Field>
+              <Field field="balcony" label="Балкон / лоджия"><TextInput d={P} k="balcony" set={sP} /></Field>
+              <Field field="communications" label="Коммуникации" className="sm:col-span-2 lg:col-span-3"><TextInput d={P} k="communications" set={sP} /></Field>
+              <Field field="description" label="Описание объекта" className="sm:col-span-2 lg:col-span-4"><TextArea d={P} k="description" set={sP} rows={3} /></Field>
             </div>
           </Panel>
 
           <Panel title="Правовые сведения">
             <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Field label="Вид права" source={src(pv, "rights")}><TextInput d={P} k="rights" set={sP} /></Field>
-              <Field label="Правообладатель" className="lg:col-span-2"><TextInput d={P} k="rightHolders" set={sP} /></Field>
-              <Field label="Обременения" source={src(pv, "encumbrances")}><TextInput d={P} k="encumbrances" set={sP} /></Field>
+              <Field field="rights" label="Вид права" source={src(pv, "rights")}><TextInput d={P} k="rights" set={sP} /></Field>
+              <Field field="rightHolders" label="Правообладатель" className="lg:col-span-2"><TextInput d={P} k="rightHolders" set={sP} /></Field>
+              <Field field="encumbrances" label="Обременения" source={src(pv, "encumbrances")}><TextInput d={P} k="encumbrances" set={sP} /></Field>
             </div>
           </Panel>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Panel title="Здание">
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                <Field label="Кадастровый номер здания"><TextInput d={B} k="cadastralNumber" set={sB} /></Field>
-                <Field label="Серия"><TextInput d={B} k="series" set={sB} /></Field>
-                <Field label="Техническое состояние"><Select d={B} k="houseCondition" set={sB} options={CONDITION_OPTIONS} /></Field>
-                <Field label="Год капремонта"><NumInput d={B} k="overhaulYear" set={sB} /></Field>
-                <Field label="Лифты"><TextInput d={B} k="elevators" set={sB} /></Field>
-                <Field label="Парковка"><TextInput d={B} k="parking" set={sB} /></Field>
-                <Field label="Описание здания" className="col-span-2"><TextArea d={B} k="description" set={sB} rows={2} /></Field>
+                <Field field="building.cadastralNumber" label="Кадастровый номер здания"><TextInput d={B} k="cadastralNumber" set={sB} /></Field>
+                <Field field="building.series" label="Серия"><TextInput d={B} k="series" set={sB} /></Field>
+                <Field field="building.houseCondition" label="Техническое состояние"><Select d={B} k="houseCondition" set={sB} options={CONDITION_OPTIONS} /></Field>
+                <Field field="building.overhaulYear" label="Год капремонта"><NumInput d={B} k="overhaulYear" set={sB} /></Field>
+                <Field field="building.elevators" label="Лифты"><TextInput d={B} k="elevators" set={sB} /></Field>
+                <Field field="building.parking" label="Парковка"><TextInput d={B} k="parking" set={sB} /></Field>
+                <Field field="building.description" label="Описание здания" className="col-span-2"><TextArea d={B} k="description" set={sB} rows={2} /></Field>
               </div>
             </Panel>
             <Panel title="Местоположение">
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                <Field label="Район"><TextInput d={P} k="district" set={sP} /></Field>
-                <Field label="Ближайшее метро" source={src(pv, "metroName")}><TextInput d={P} k="metroName" set={sP} /></Field>
-                <Field label="Расстояние до метро" hint="Используется в корректировке на транспортную доступность" source={src(pv, "metroDistanceM")}><NumInput d={P} k="metroDistanceM" set={sP} suffix="м" /></Field>
-                <Field label="Широта" source={src(pv, "latitude")}><NumInput d={P} k="latitude" set={sP} placeholder="55.753083" /></Field>
-                <Field label="Долгота" source={src(pv, "longitude")}><NumInput d={P} k="longitude" set={sP} placeholder="37.587614" /></Field>
+                <Field field="district" label="Район"><TextInput d={P} k="district" set={sP} /></Field>
+                <Field field="metroName" label="Ближайшее метро" source={src(pv, "metroName")}><TextInput d={P} k="metroName" set={sP} /></Field>
+                <Field field="metroDistanceM" label="Расстояние до метро" hint="Используется в корректировке на транспортную доступность" source={src(pv, "metroDistanceM")}><NumInput d={P} k="metroDistanceM" set={sP} suffix="м" /></Field>
+                <Field field="latitude" label="Широта" source={src(pv, "latitude")}><NumInput d={P} k="latitude" set={sP} placeholder="55.753083" /></Field>
+                <Field field="longitude" label="Долгота" source={src(pv, "longitude")}><NumInput d={P} k="longitude" set={sP} placeholder="37.587614" /></Field>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <button className="btn btn-secondary btn-sm" onClick={() => locate("geocode")} disabled={!!geoBusy || !String(P.address ?? "").trim()} title="Яндекс Геокодер: адрес → координаты">
@@ -220,7 +244,7 @@ export function PropertyTab({ detail, reload, checklist, go }: WsProps) {
                   <a href={mapUrl(Number(detail.property.latitude), Number(detail.property.longitude))} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm"><Icon name="external" size={13} />На карте</a>
                 )}
               </div>
-              {geoMsg && (
+              {geoMsg && !geoMsg.top && (
                 <Notice tone={geoMsg.tone} className="mt-3" action={geoMsg.address && geoMsg.address !== P.address ? <button className="btn btn-secondary btn-sm" onClick={() => { sP("address", geoMsg.address); setGeoMsg(null); }}>Подставить</button> : undefined}>
                   {geoMsg.text}
                 </Notice>
@@ -249,6 +273,11 @@ export function PropertyTab({ detail, reload, checklist, go }: WsProps) {
         </div>
 
         <div className="space-y-4">
+          <Panel title="Положение объекта" bodyClassName="p-3">
+            <EnvironmentMap points={envPoints.filter((p) => p.kind === "subject")} layers={[]} height={220} emptyText="Введите и выберите адрес, чтобы определить положение объекта." />
+            <AddressSummary details={(detail.property.addressDetails as AddressDetails | null) ?? null} lat={detail.property.latitude} lon={detail.property.longitude} source={pv?.latitude?.title} />
+            {geoMsg?.top && <Notice tone={geoMsg.tone} className="mt-2">{geoMsg.text}</Notice>}
+          </Panel>
           <Panel
             title="Выписка ЕГРН"
             actions={
@@ -336,5 +365,29 @@ export function PropertyTab({ detail, reload, checklist, go }: WsProps) {
         Файл будет удалён из оценки. Файлы, использованные в зафиксированной версии расчёта, удалить нельзя.
       </ConfirmModal>
     </div>
+  );
+}
+
+/** Разобранный адрес и координаты (что сохранено при выборе адреса). */
+function AddressSummary({ details, lat, lon, source }: { details: AddressDetails | null; lat: unknown; lon: unknown; source?: string }) {
+  const rows: Array<[string, string | null]> = [
+    ["Регион", details?.region ?? null],
+    ["Населённый пункт", details?.locality ?? null],
+    ["Улица", details?.street ?? null],
+    ["Дом", details?.house ?? null],
+    ["ГАР", details?.garGuid ?? null],
+    ["Координаты", lat != null && lon != null ? `${Number(lat).toFixed(6)}, ${Number(lon).toFixed(6)}` : null],
+  ];
+  return (
+    <dl className="mt-2.5 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-[12px]">
+      {rows.map(([k, v]) => (
+        <div key={k} className="contents">
+          <dt className="text-muted">{k}</dt>
+          <dd className={`[overflow-wrap:anywhere] ${v ? "text-zinc-800" : "text-muted"}`}>{v ?? "нет данных"}</dd>
+        </div>
+      ))}
+      <dt className="text-muted">Источник</dt>
+      <dd className="[overflow-wrap:anywhere] text-zinc-800">{details ? (details.source === "gar" ? "ГАР" : "Яндекс Геокодер") : "адрес не выбран из подсказок"}{source ? ` · ${source}` : ""}</dd>
+    </dl>
   );
 }

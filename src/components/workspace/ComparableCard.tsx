@@ -19,7 +19,7 @@ import type { AdjustmentRow, ComparableRow, Detail } from "./types";
 export const STATUS_LABEL: Record<string, string> = { use: "Используется", review: "На проверке", exclude: "Не используется" };
 export const STATUS_TONE: Record<string, Tone> = { use: "ok", review: "warn", exclude: "neutral" };
 
-const showVal = (v: unknown) => (v === null || v === undefined || v === "" ? "—" : typeof v === "number" ? fmtNumber(v, Number.isInteger(v) ? 0 : 2, true) : /^\d{4}-\d{2}-\d{2}/.test(String(v)) ? fmtDate(String(v)) : String(v));
+const showVal = (v: unknown) => (v === null || v === undefined || v === "" ? "Нет данных" : typeof v === "number" ? fmtNumber(v, Number.isInteger(v) ? 0 : 2, true) : /^\d{4}-\d{2}-\d{2}/.test(String(v)) ? fmtDate(String(v)) : String(v));
 const nd = (v: unknown) => (v === null || v === undefined || v === "" ? <span className="text-muted">{NO_DATA}</span> : String(v));
 const pctInput = (v: string) => fmtNumber(d(v).mul(100), 2, true).replace(/ /g, "");
 const parsePct = (s: string) => {
@@ -122,8 +122,8 @@ function AdjLine({ a, assessmentId, onSaved, step }: { a: AdjustmentRow; assessm
           <div className="text-[11.5px] text-muted">{rs?.factor?.groupName ?? (a.stage === 1 ? "1-я группа" : "2-я группа")}</div>
         </td>
         <td className="align-top text-[12.5px]">
-          <div><span className="text-muted">Объект: </span>{a.subjectValue ?? "—"}</div>
-          <div><span className="text-muted">Аналог: </span>{a.comparableValue ?? "—"}</div>
+          <div><span className="text-muted">Объект: </span>{a.subjectValue ?? "Нет данных"}</div>
+          <div><span className="text-muted">Аналог: </span>{a.comparableValue ?? "Нет данных"}</div>
         </td>
         <td className="num align-top text-right text-[12.5px]">
           {a.notRequired ? "—" : fmtNumber(k, 4)}
@@ -279,7 +279,7 @@ export function ComparableCard({ c, label, detail, mode, weight, reload, onEdit,
           {kv("Цена за м²", `${fmtNumber(unit, 0)} ₽`)}
           {kv("Площадь", `${fmtNumber(c.area, 2, true)} м²`)}
           {kv("Комнат", nd(c.rooms))}
-          {kv("Этаж / этажность", `${c.floor ?? "—"} / ${c.floors ?? "—"}`)}
+          {kv("Этаж / этажность", `${c.floor ?? "нет данных"} / ${c.floors ?? "нет данных"}`)}
           {kv("Тип дома (источник)", nd(c.houseType))}
           {kv("Материал стен", c.wallMaterial ? WALL_MATERIALS[c.wallMaterial] ?? c.wallMaterial : nd(null))}
           {kv("Отделка", c.finishing ? `${FINISHING[c.finishing] ?? c.finishing}${n.renovationRaw ? ` («${n.renovationRaw}»)` : ""}` : nd(n.renovationRaw ?? null))}
@@ -288,7 +288,7 @@ export function ComparableCard({ c, label, detail, mode, weight, reload, onEdit,
           {kv("До метро", c.metroDistanceM !== null ? `${fmtNumber(c.metroDistanceM, 0)} м${n.metroName ? ` · ${n.metroName}` : ""}` : n.metroMinutes != null ? `${n.metroMinutes} мин (по объявлению)` : nd(null))}
           {kv("Дата публикации", c.offerDate ? fmtDate(c.offerDate) : nd(null))}
           {kv("Дата обновления", c.sourceUpdatedAt ? fmtDate(c.sourceUpdatedAt) : nd(null))}
-          {kv("Источник", `${c.sourceName ?? "—"}${c.provider === "metrapi" ? " · Metrapi" : ""}`)}
+          {kv("Источник", `${c.sourceName ?? "Нет данных"}${c.provider === "metrapi" ? " · Metrapi" : ""}`)}
           {kv("Получено", fmtDate(c.retrievedAt))}
           {kv("Координаты", c.latitude && c.longitude ? `${Number(c.latitude).toFixed(5)}, ${Number(c.longitude).toFixed(5)}` : nd(null))}
           {n.sources && n.sources.length > 1 && <div className="col-span-2 min-w-0 sm:col-span-3 lg:col-span-4">{kv("Также размещено", n.sources.map((s) => `${s.source}${s.price ? ` — ${fmtNumber(s.price, 0)} ₽` : ""}`).join(" · "))}</div>}

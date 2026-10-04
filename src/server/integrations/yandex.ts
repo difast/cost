@@ -12,7 +12,8 @@ export { distanceM, type GeoPoint };
 
 const GEOCODER_URL = process.env.YANDEX_GEOCODER_URL || "https://geocode-maps.yandex.ru/1.x/";
 const SEARCH_URL = process.env.YANDEX_SEARCH_URL || "https://search-maps.yandex.ru/v1/";
-const TIMEOUT_MS = 10_000;
+/** Таймаут запроса, мс (YANDEX_TIMEOUT_MS — для тестов и медленных сетей). */
+const timeoutMs = () => Number(process.env.YANDEX_TIMEOUT_MS) || 10_000;
 
 /** Ключ геокодера. */
 const geocoderKey = () => process.env.YANDEX_API_KEY?.trim() || "";
@@ -51,15 +52,18 @@ function requireKey(key: string, what: string) {
 async function getJson(url: URL, what: string): Promise<unknown> {
   let res: Response;
   try {
-    res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { Accept: "application/json" }, cache: "no-store" });
+    res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs()), headers: { Accept: "application/json" }, cache: "no-store" });
   } catch (e) {
+    if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) {
+      throw new HttpError(504, `${what} не ответил за ${Math.round(timeoutMs() / 1000)} с. Повторите попытку позже.`);
+    }
     console.error(`${what}: сетевая ошибка`, e);
     throw new HttpError(502, `${what} недоступен. Повторите попытку позже.`);
   }
   if (res.status === 401 || res.status === 403) {
     throw new HttpError(502, `${what}: ключ API отклонён (HTTP ${res.status}). Проверьте, что ключ активен и подключён к этому сервису Яндекса.`);
   }
-  if (res.status === 429) throw new HttpError(502, `${what}: превышен лимит запросов по ключу API.`);
+  if (res.status === 429) throw new HttpError(429, `${what}: превышен лимит запросов по ключу API. Повторите попытку позже.`);
   if (!res.ok) throw new HttpError(502, `${what} вернул ошибку (HTTP ${res.status}).`);
   try {
     return await res.json();
@@ -110,6 +114,12 @@ function toGeocodeResult(g: GeoObject): GeocodeResult | null {
 export async function geocode(address: string): Promise<GeocodeResult | null> {
   const [first] = await geocoderRequest({ geocode: address, results: "1" });
   return first ? toGeocodeResult(first) : null;
+}
+
+/** Несколько вариантов адреса (для подсказок, если ГАР не загружен или не нашёл адрес). */
+export async function geocodeMany(address: string, limit = 5): Promise<GeocodeResult[]> {
+  const items = await geocoderRequest({ geocode: address, results: String(limit) });
+  return items.map(toGeocodeResult).filter((x): x is GeocodeResult => !!x);
 }
 
 /** Обратное геокодирование: координаты → адрес (ближайший дом). */

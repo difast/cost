@@ -37,9 +37,10 @@ export function InfrastructurePanel({ infra, lat, lon, busy, onSearch, onUseMetr
       {!hasCoords && !infra && <p className="text-[12.5px] text-muted">Определите координаты объекта по адресу в блоке «Местоположение» — затем станет доступен поиск ближайшей инфраструктуры.</p>}
       {hasCoords && !infra && !busy && <p className="text-[12.5px] text-muted">Координаты определены. Нажмите «Найти инфраструктуру», чтобы получить ближайшие объекты из Яндекс Карт. Результат сохранится в оценке и попадёт в раздел отчёта «Местоположение и окружение».</p>}
       {stale && <Notice tone="warn" className="mb-3">Координаты объекта изменились после поиска. Обновите инфраструктуру, чтобы расстояния соответствовали текущему положению объекта.</Notice>}
+      {infra && total === 0 && <Notice tone="info" className="mb-3">Организации не найдены в заданном радиусе.</Notice>}
       {infra && (
         <div className="grid gap-3 md:grid-cols-2">
-          {infra.categories.map((c) => <CategoryBlock key={c.key} c={c} onUseMetro={onUseMetro} />)}
+          {infra.categories.map((c) => <CategoryBlock key={c.key} c={c} onUseMetro={onUseMetro} source={c.key === "metro" ? "Яндекс Геокодер" : infra.providerTitle ?? "Яндекс Карты"} />)}
         </div>
       )}
     </Panel>
@@ -47,7 +48,7 @@ export function InfrastructurePanel({ infra, lat, lon, busy, onSearch, onUseMetr
 
 }
 
-function CategoryBlock({ c, onUseMetro }: { c: InfraCategory; onUseMetro: Props["onUseMetro"] }) {
+function CategoryBlock({ c, onUseMetro, source }: { c: InfraCategory; onUseMetro: Props["onUseMetro"]; source: string }) {
   return (
     <div className="min-w-0 rounded-md border border-line">
       <div className="flex items-center justify-between gap-2 border-b border-line bg-subtle px-3 py-2">
@@ -62,6 +63,7 @@ function CategoryBlock({ c, onUseMetro }: { c: InfraCategory; onUseMetro: Props[
                 <a href={mapUrl(i.lat, i.lon)} target="_blank" rel="noopener noreferrer" className="block break-words text-[13px] leading-snug text-ink hover:text-brand" title="Показать на Яндекс Картах">{i.name}</a>
                 {i.type && <div className="truncate text-[11.5px] text-muted">{i.type}</div>}
                 {i.address && <div className="text-[11.5px] leading-snug text-muted">{i.address}</div>}
+                <div className="text-[11px] leading-snug text-muted">{i.lat.toFixed(6)}, {i.lon.toFixed(6)} · {source}</div>
                 {c.key === "metro" && idx === 0 && (
                   <button className="mt-1 text-[11.5px] font-medium text-brand hover:underline" onClick={() => onUseMetro(i.name, i.distanceM)}>Указать как ближайшее метро</button>
                 )}
@@ -72,7 +74,7 @@ function CategoryBlock({ c, onUseMetro }: { c: InfraCategory; onUseMetro: Props[
         </ul>
       ) : (
         <p className="px-3 py-2.5 text-[12px] text-muted">
-          {c.status === "error" ? c.error ?? "Данные не получены" : c.key === "metro" ? `Станций метро в радиусе ${fmtDistance(c.radiusM)} нет` : `В радиусе ${fmtDistance(c.radiusM)} не найдено`}
+          {c.status === "error" ? c.error ?? "Данные не получены" : c.key === "metro" ? `Станций метро в радиусе ${fmtDistance(c.radiusM)} нет` : `Организации не найдены в заданном радиусе (${fmtDistance(c.radiusM)}).`}
         </p>
       )}
     </div>

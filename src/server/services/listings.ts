@@ -12,7 +12,8 @@ import { stableStringify, sha256 } from "@/server/stable";
 import { metrapiConfigured, metrapiItem, metrapiSearch } from "@/server/integrations/metrapi";
 import { nearestMetro, yandexConfigured } from "@/server/integrations/yandex";
 import { METRAPI_PROVIDER } from "@/core/listings/metrapi";
-import { applyLocalFilters, type LocalFilterStats, type RankedListing } from "@/core/listings/filter";
+import { type LocalFilterStats, type RankedListing } from "@/core/listings/filter";
+import { cascadeSearch, type CascadeStep } from "@/core/listings/cascade";
 import type { Listing, ListingQuery } from "@/core/listings/model";
 import { distanceM, toPoint } from "@/core/geo";
 import { syncAdjustments } from "./assessment";
@@ -34,6 +35,8 @@ export interface SearchMeta {
   query: ListingQuery;
   total: number | null;
   stats: LocalFilterStats;
+  /** Каскад: шаги поиска, ослабленные условия, сообщение для интерфейса. */
+  cascade: { steps: CascadeStep[]; relaxed: string[]; applied: string[]; message: string | null } | null;
   createdAt: string;
   expiresAt: string;
   fromCache: boolean;
@@ -55,7 +58,9 @@ export async function defaultListingQuery(assessmentId: string): Promise<Listing
   const comps = ((p?.provenance as Record<string, { components?: Array<{ kind: string; name: string }> }> | null)?.latitude?.components ?? []);
   const provinces = comps.filter((c) => c.kind === "province");
   const region = provinces.length ? provinces[provinces.length - 1].name : null;
-  const locality = comps.find((c) => c.kind === "locality")?.name ?? cityFromAddress(p?.address);
+  const details = (p?.addressDetails ?? null) as { locality?: string | null; street?: string | null; region?: string | null } | null;
+  const locality = details?.locality ?? comps.find((c) => c.kind === "locality")?.name ?? cityFromAddress(p?.address);
+  const street = details?.street ?? comps.filter((c) => c.kind === "street").at(-1)?.name ?? null;
   const center = toPoint(p?.latitude, p?.longitude);
   if (!center) hints.push("Координаты объекта не определены — фильтр по расстоянию недоступен. Определите их в разделе «Объект».");
   if (!locality && !region) hints.push("Не удалось определить населённый пункт — укажите его вручную.");
@@ -63,8 +68,9 @@ export async function defaultListingQuery(assessmentId: string): Promise<Listing
   const ref = a.valuationDate ?? new Date();
   const from = new Date(ref.getTime() - 180 * 86_400_000);
   return {
-    region: locality ? null : region,
+    region: locality ? null : details?.region ?? region,
     locality,
+    street,
     center,
     radiusM: center ? 2000 : null,
     rooms: p?.rooms ? [p.rooms] : [],
@@ -87,8 +93,8 @@ export async function defaultListingQuery(assessmentId: string): Promise<Listing
 }
 
 function toMeta(s: { id: string; provider: string; query: unknown; total: number | null; results: unknown; createdAt: Date; expiresAt: Date }, fromCache: boolean): SearchMeta {
-  const r = s.results as { stats: LocalFilterStats };
-  return { id: s.id, provider: s.provider, query: s.query as ListingQuery, total: s.total, stats: r.stats, createdAt: s.createdAt.toISOString(), expiresAt: s.expiresAt.toISOString(), fromCache };
+  const r = s.results as { stats: LocalFilterStats; cascade?: SearchMeta["cascade"] };
+  return { id: s.id, provider: s.provider, query: s.query as ListingQuery, total: s.total, stats: r.stats, cascade: r.cascade ?? null, createdAt: s.createdAt.toISOString(), expiresAt: s.expiresAt.toISOString(), fromCache };
 }
 
 /** Поиск объявлений. Повтор с теми же параметрами в течение 6 ч берётся из кэша. */
@@ -99,8 +105,13 @@ export async function searchListings(assessmentId: string, userId: string, query
     const cached = await prisma.listingSearch.findFirst({ where: { assessmentId, provider: METRAPI_PROVIDER, queryHash, expiresAt: { gt: new Date() } }, orderBy: { createdAt: "desc" } });
     if (cached) return toMeta(cached, true);
   }
-  const { count, items } = await metrapiSearch(query);
-  const { items: kept, stats } = applyLocalFilters(items, query);
+  const subj = await prisma.assessment.findUniqueOrThrow({ where: { id: assessmentId }, select: { property: { select: { rooms: true, area: true, floor: true, finishing: true } }, building: { select: { floors: true, wallMaterial: true } } } });
+  const r = await cascadeSearch(query, {
+    rooms: subj.property?.rooms ?? null, area: subj.property?.area ? Number(subj.property.area) : null, floor: subj.property?.floor ?? null,
+    floors: subj.building?.floors ?? null, wallMaterial: subj.building?.wallMaterial ?? null, finishing: subj.property?.finishing ?? null,
+  }, metrapiSearch);
+  const { items: kept, stats, total: count } = r;
+  const cascade = { steps: r.steps, relaxed: r.relaxed, applied: r.applied, message: r.message };
   const saved = await prisma.listingSearch.create({
     data: {
       assessmentId,
@@ -108,14 +119,14 @@ export async function searchListings(assessmentId: string, userId: string, query
       queryHash,
       query: query as unknown as Prisma.InputJsonValue,
       total: count,
-      results: { stats, items: kept.slice(0, MAX_STORED) } as unknown as Prisma.InputJsonValue,
+      results: { stats, cascade, items: kept.slice(0, MAX_STORED) } as unknown as Prisma.InputJsonValue,
       expiresAt: new Date(Date.now() + CACHE_TTL_MS),
     },
   });
   // старые результаты этой оценки больше не нужны — храним последние 5 поисков
   const old = await prisma.listingSearch.findMany({ where: { assessmentId }, orderBy: { createdAt: "desc" }, skip: 5, select: { id: true } });
   if (old.length) await prisma.listingSearch.deleteMany({ where: { id: { in: old.map((o) => o.id) } } });
-  await logEvent({ assessmentId, userId, action: "update", entity: "listing_search", entityId: saved.id, summary: `Поиск аналогов в Metrapi: получено ${stats.received}${count !== null ? ` из ${count}` : ""}, после фильтров ${stats.kept}` });
+  await logEvent({ assessmentId, userId, action: "update", entity: "listing_search", entityId: saved.id, summary: `Поиск аналогов в Metrapi: запросов ${r.steps.filter((x) => x.received !== null).length}, после фильтров ${stats.kept}${r.relaxed.length ? `; ослаблены условия: ${r.relaxed.join("; ")}` : ""}` });
   return toMeta(saved, false);
 }
 

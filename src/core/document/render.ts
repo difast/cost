@@ -90,18 +90,43 @@ function textToBlocks(text: string, style: TextStyle): ReportBlock[] {
   return out;
 }
 
-/** Модель документа для предпросмотра, DOCX и PDF. */
-export function documentToReportDoc(doc: DocumentContent, c: DocContext): ReportDoc {
+export const SECTION_LABEL: Record<string, string> = {
+  assignment: "Задание", property: "Объект", appraiser: "Оценщик", comparables: "Аналоги", adjustments: "Корректировки",
+  calculation: "Расчёт", text: "Тексты", report: "Отчёт",
+};
+const LEVEL: Record<string, string> = { error: "Ошибка", warning: "Предупреждение", info: "Информация" };
+
+/** Раздел «Замечания к оценке»: ошибки и предупреждения проверок (если есть). */
+export function remarksBlocks(c: DocContext): ReportBlock[] {
+  const list = c.checks.issues.filter((i) => i.severity === "error" || i.severity === "warning");
+  if (!list.length) return [];
+  return [
+    { type: "heading", level: 1, text: "Замечания к оценке" },
+    { type: "paragraph", italic: true, text: `Автоматические проверки выявили замечания: ошибок ${c.checks.errors}, предупреждений ${c.checks.warnings}. Перечень приводится для проверки оценщиком.` },
+    { type: "table", small: true, header: ["Уровень", "Раздел", "Замечание"], rows: list.map((i) => [LEVEL[i.severity], SECTION_LABEL[i.section] ?? i.section, i.message]), widths: [1.4, 1.4, 7] },
+  ];
+}
+
+/** Модель документа для предпросмотра, DOCX и PDF. remarks — добавить «Замечания к оценке», draft — пометка «Черновик». */
+export function documentToReportDoc(doc: DocumentContent, c: DocContext, opts: { remarks?: boolean; draft?: boolean } = {}): ReportDoc {
   const blocks: ReportBlock[] = [];
+  if (opts.draft) blocks.push({ type: "paragraph", bold: true, align: "center", text: "ЧЕРНОВИК — не является итоговой версией отчёта" });
+  let first = true;
   for (const sec of resolveDocument(doc, c)) {
     if (sec.pageBreakBefore && blocks.length) blocks.push({ type: "pageBreak" });
     if (sec.numbered) blocks.push({ type: "heading", level: 1, text: `${sec.number}. ${sec.title}` });
     for (const b of sec.blocks) blocks.push(...(b.type === "text" ? textToBlocks(b.text, b.style) : b.blocks));
+    // замечания — сразу после титульной части
+    if (first && opts.remarks) {
+      const r = remarksBlocks(c);
+      if (r.length) blocks.push({ type: "pageBreak" }, ...r);
+    }
+    first = false;
   }
   const s = c.snapshot;
   return {
     title: `Отчёт № ${s.assessment.number} об оценке рыночной стоимости: ${s.property.address ?? NO_VALUE}`,
-    footer: reportFooter(s),
+    footer: `${opts.draft ? "ЧЕРНОВИК · " : ""}${reportFooter(s)}`,
     blocks,
   };
 }

@@ -4,9 +4,10 @@ import type { ReactNode } from "react";
 import { Icon } from "./Icon";
 import { fmtDate } from "@/core/format";
 
-export function Field({ label, children, hint, className = "", source, required, error }: { label: string; children: ReactNode; hint?: ReactNode; className?: string; source?: ReactNode; required?: boolean; error?: ReactNode }) {
+/** field — путь поля для перехода из «Контроля качества» (см. focusField). */
+export function Field({ label, children, hint, className = "", source, required, error, field }: { label: string; children: ReactNode; hint?: ReactNode; className?: string; source?: ReactNode; required?: boolean; error?: ReactNode; field?: string }) {
   return (
-    <div className={`min-w-0 ${className}`}>
+    <div className={`min-w-0 rounded-md ${className}`} data-field={field}>
       <div className="mb-1 flex min-h-[18px] items-center justify-between gap-2">
         <span className="text-[12px] font-medium text-muted">{label}{required && <span className="ml-0.5 text-err">*</span>}</span>
         {source}

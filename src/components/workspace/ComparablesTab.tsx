@@ -15,14 +15,15 @@ import { Badge, ConfirmModal, EmptyState, Notice, Panel, Segmented, toast } from
 import { NextStep, StepIssues } from "./common";
 import { ComparableModal, SourceCell } from "./ComparableModal";
 import { ComparableCard, STATUS_LABEL, STATUS_TONE, comparableChain } from "./ComparableCard";
-import { EnvironmentMap, infraPoints, unitPriceLine, type MapPoint } from "./EnvironmentMap";
+import { EnvironmentMap, infraPoints, subjectPoint, unitPriceLine, type MapPoint } from "./EnvironmentMap";
 import { ListingSearchPanel, type QueryState } from "./ListingSearchPanel";
 import type { WsProps } from "./Workspace";
 import type { ComparableRow } from "./types";
 
 type ListingView = Listing & { distanceM: number | null; inAssessment: { comparableId: string; status: string } | null };
 type Point = { externalId: string; lat: number; lon: number; unitPrice: number | null; price: number | null; area: number | null; address: string | null; distanceM: number | null; inAssessment: string | null };
-interface SearchMeta { id: string; total: number | null; stats: { received: number; kept: number; noCoords: number; tooFar: number; unitPrice: number; furniture: number }; createdAt: string; expiresAt: string; fromCache: boolean; query: QueryState }
+interface CascadeInfo { steps: Array<{ label: string; relaxed: string[]; received: number | null; kept: number }>; relaxed: string[]; applied: string[]; message: string | null }
+interface SearchMeta { id: string; total: number | null; stats: { received: number; kept: number; noCoords: number; tooFar: number; unitPrice: number; furniture: number }; cascade: CascadeInfo | null; createdAt: string; expiresAt: string; fromCache: boolean; query: QueryState }
 interface ListingsResponse { configured: boolean; defaults?: QueryState; search: SearchMeta | null; items: ListingView[]; points: Point[]; total: number; offset: number; limit: number }
 
 const PAGE = 20;
@@ -56,7 +57,7 @@ function ListingRow({ l, active, onAdd, onFocus, busy }: { l: ListingView; activ
         <div className="num mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[12px] text-zinc-700">
           <span>{nd(l.area !== null ? fmtNumber(l.area, 1, true) : null, " м²")}</span>
           <span>{l.rooms !== null ? `${l.rooms}-комн.` : nd(null)}</span>
-          <span>этаж {l.floor ?? "—"}/{l.floors ?? "—"}</span>
+          <span>этаж {l.floor ?? "нет данных"}/{l.floors ?? "нет данных"}</span>
           <span>{l.houseTypeRaw ?? <span className="text-muted">тип дома: нет данных</span>}</span>
           <span>{l.renovationRaw ?? <span className="text-muted">ремонт: нет данных</span>}</span>
           {l.buildYear && <span>{l.buildYear} г.</span>}
@@ -78,7 +79,7 @@ function ListingRow({ l, active, onAdd, onFocus, busy }: { l: ListingView; activ
   );
 }
 
-export function ComparablesTab({ detail, reload, calc, checklist, go }: WsProps) {
+export function ComparablesTab({ detail, reload, calc, checklist, go, focus }: WsProps) {
   const [data, setData] = useState<ListingsResponse | null>(null);
   const [q, setQ] = useState<QueryState | null>(null);
   const [busy, setBusy] = useState(false);
@@ -91,6 +92,14 @@ export function ComparablesTab({ detail, reload, calc, checklist, go }: WsProps)
   const [removing, setRemoving] = useState<ComparableRow | null>(null);
   const [importMsg, setImportMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
   const csvRef = useRef<HTMLInputElement>(null);
+  // переход из «Контроля качества» к полю аналога: раскрыть его карточку
+  useEffect(() => {
+    const id = focus?.match(/^comparable\.([^.]+)/)?.[1];
+    if (id && detail.comparables.some((c) => c.id === id)) {
+      setTab("assessment");
+      setExpanded(id);
+    }
+  }, [focus, detail.comparables]);
   const items = checklist?.items.filter((i) => i.step === "comparables") ?? [];
   const mode = calc?.settings.adjustmentMode ?? "sequential";
   const resById = Object.fromEntries((calc?.result?.comparables ?? []).map((c) => [c.id, c]));
@@ -170,7 +179,8 @@ export function ComparablesTab({ detail, reload, calc, checklist, go }: WsProps)
   const points = useMemo<MapPoint[]>(() => {
     const out: MapPoint[] = [];
     if (p.latitude != null && p.longitude != null) {
-      out.push({ id: "subject", kind: "subject", lat: Number(p.latitude), lon: Number(p.longitude), title: "Объект оценки", lines: [String(p.address ?? ""), p.area ? `${fmtNumber(p.area as string, 2, true)} м²` : ""].filter(Boolean) });
+      const sp = subjectPoint(p.latitude, p.longitude, p.address);
+      if (sp) out.push({ ...sp, lines: [String(p.address ?? ""), p.area ? `${fmtNumber(p.area as string, 2, true)} м²` : ""].filter(Boolean) });
     }
     for (const c of detail.comparables) {
       if (c.latitude == null || c.longitude == null) continue;
@@ -248,6 +258,7 @@ export function ComparablesTab({ detail, reload, calc, checklist, go }: WsProps)
             {s.stats.tooFar ? ` · дальше радиуса ${s.stats.tooFar}` : ""}{s.stats.noCoords ? ` · без координат ${s.stats.noCoords}` : ""}{s.stats.unitPrice ? ` · по цене за м² ${s.stats.unitPrice}` : ""}{s.stats.furniture ? ` · по мебели ${s.stats.furniture}` : ""}
           </p>
         )}
+        {s?.cascade && <CascadeNotice c={s.cascade} />}
       </Panel>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_440px]">
@@ -267,7 +278,7 @@ export function ComparablesTab({ detail, reload, calc, checklist, go }: WsProps)
                   const open = expanded === c.id;
                   const r = resById[c.id];
                   return (
-                    <li key={c.id} id={`cmp-${c.id}`} className={selected === `cmp:${c.id}` ? "bg-brand-soft/30" : ""}>
+                    <li key={c.id} id={`cmp-${c.id}`} data-field={`comparable.${c.id}`} className={selected === `cmp:${c.id}` ? "bg-brand-soft/30" : ""}>
                       <button className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-subtle/60" onClick={() => { setExpanded(open ? null : c.id); setSelected(`cmp:${c.id}`); }} aria-expanded={open}>
                         <span className={`num mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-white ${c.status === "use" ? "bg-brand" : c.status === "review" ? "bg-warn" : "bg-[#9aa39e]"}`}>{numOf(c)}</span>
                         <div className="min-w-0 flex-1">
@@ -277,7 +288,7 @@ export function ComparablesTab({ detail, reload, calc, checklist, go }: WsProps)
                               <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px] text-muted">
                                 <Badge tone={STATUS_TONE[c.status]}>{STATUS_LABEL[c.status]}</Badge>
                                 <span>{c.distanceM !== null ? `${fmtNumber(c.distanceM, 0)} м` : "расстояние: нет данных"}</span>
-                                <span className="num">{fmtNumber(c.area, 1, true)} м² · {c.floor ?? "—"}/{c.floors ?? "—"} эт.</span>
+                                <span className="num">{fmtNumber(c.area, 1, true)} м² · {c.floor ?? "нет данных"}/{c.floors ?? "нет данных"} эт.</span>
                                 <span>корр.: {ch.count}</span>
                                 <span onClick={(e) => e.stopPropagation()}><SourceCell c={c} /></span>
                               </div>
@@ -373,6 +384,32 @@ export function ComparablesTab({ detail, reload, calc, checklist, go }: WsProps)
       <ConfirmModal open={!!removing} title="Удалить аналог?" onClose={() => setRemoving(null)} onConfirm={() => removing && remove(removing)}>
         Аналог и его корректировки будут удалены из оценки. Зафиксированные версии расчёта не изменятся.
       </ConfirmModal>
+    </div>
+  );
+}
+
+/** Как выполнялся каскадный поиск: шаги, ослабленные условия, итоговые условия. */
+function CascadeNotice({ c }: { c: CascadeInfo }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`mt-2 rounded-md border px-3 py-2 text-[12.5px] ${c.message ? "border-warn/30 bg-warn-soft" : "border-line bg-canvas"}`}>
+      <div className="flex flex-wrap items-start gap-2">
+        <span className="min-w-0 flex-1 [overflow-wrap:anywhere] text-zinc-800">
+          {c.message ?? "Аналоги найдены по заданным условиям без ослабления."}
+          {c.applied.length > 0 && <span className="text-muted"> Итоговые условия: {c.applied.join(", ")}. Результаты отсортированы по сходству с объектом.</span>}
+        </span>
+        <button type="button" className="text-[12px] text-brand underline-offset-2 hover:underline" onClick={() => setOpen(!open)}>{open ? "Скрыть шаги" : `Шаги поиска · ${c.steps.length}`}</button>
+      </div>
+      {open && (
+        <ol className="mt-1.5 list-decimal space-y-0.5 pl-5 text-[12px] text-zinc-700">
+          {c.steps.map((st, i) => (
+            <li key={i} className="[overflow-wrap:anywhere]">
+              {st.relaxed.length ? <span className="text-warn">ослаблено: {st.relaxed.join(", ")} → </span> : null}
+              {st.label}: {st.received !== null ? `получено ${st.received}, ` : "без нового запроса, "}подходит {st.kept}
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   );
 }

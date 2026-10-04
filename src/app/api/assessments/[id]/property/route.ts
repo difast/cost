@@ -5,6 +5,7 @@ import { api, body, ok, type Params } from "@/server/http";
 import { requireUser } from "@/server/auth";
 import { buildingSchema, propertySchema } from "@/server/schemas";
 import { getOwned, syncAdjustments, updateWithAudit } from "@/server/services/assessment";
+import { regeocodeAfterManualChange } from "@/server/services/location";
 
 const schema = z.object({ property: propertySchema.optional(), building: buildingSchema.optional() });
 
@@ -21,6 +22,7 @@ export const PUT = api(async (req, { params }: Params<"id">) => {
   const { id } = await params;
   await getOwned(id, u.id);
   const data = await body(req, schema);
+  let geocode: { updated: boolean; warning: string | null } | null = null;
   if (data.property) {
     const before = await prisma.property.findUniqueOrThrow({ where: { assessmentId: id } });
     const changed = Object.keys(data.property).filter((k) => String((before as Record<string, unknown>)[k] ?? "") !== String((data.property as Record<string, unknown>)[k] ?? ""));
@@ -29,6 +31,10 @@ export const PUT = api(async (req, { params }: Params<"id">) => {
       data: { ...data.property, provenance: markManual(before.provenance, changed, u.id) },
     });
     await updateWithAudit({ assessmentId: id, userId: u.id, entity: "property", entityId: after.id, before: { ...before, provenance: undefined }, after: { ...after, provenance: undefined }, summary: "Изменены данные объекта" });
+    // адрес изменён вручную, координаты не введены — определяем их заново, чтобы карта и расстояния соответствовали адресу
+    if (changed.includes("address") && !changed.includes("latitude") && !changed.includes("longitude")) {
+      geocode = await regeocodeAfterManualChange(id, u.id);
+    }
   }
   if (data.building) {
     const before = await prisma.building.upsert({ where: { assessmentId: id }, update: {}, create: { assessmentId: id } });
@@ -41,5 +47,5 @@ export const PUT = api(async (req, { params }: Params<"id">) => {
   }
   await prisma.assessment.update({ where: { id }, data: { updatedAt: new Date() } });
   await syncAdjustments(id);
-  return ok({ ok: true });
+  return ok({ ok: true, geocode });
 });

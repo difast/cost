@@ -8,7 +8,8 @@ import type { CalcResult } from "./types";
 /** Рост коэффициента вариации (п. п.), начиная с которого разброс считается увеличившимся. */
 export const DISPERSION_GROWTH_PP = "0.01";
 export const DISPERSION_MESSAGE = "После корректировок разброс цен увеличился. Проверьте выбор аналогов и применённые корректировки.";
-export const BLOCKED_MESSAGE = "Расчёт нельзя подтвердить до устранения ошибок.";
+/** Проверки не блокируют работу: при ошибках действие выполняется только после явного подтверждения оценщика. */
+export const ISSUES_MESSAGE = "Есть замечания, требующие внимания.";
 
 export interface CalcQuality {
   count: number;
