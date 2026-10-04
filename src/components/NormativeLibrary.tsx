@@ -1,54 +1,99 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { useEffect, useMemo, useState } from "react";
+import { api, errorText } from "@/lib/api";
 import { fmtDate } from "@/core/format";
+import { Icon } from "@/components/ui/Icon";
+import { Badge, EmptyState, Notice, PageHeader, SearchInput, Skeleton } from "@/components/ui/kit";
 
-interface Doc { id: string; kind: string; code: string | null; title: string; issuer: string | null; adoptedAt: string | null; status: string; url: string | null; summary: string | null; tags: string[]; revision: number; updatedAt: string }
+interface Doc { id: string; kind: string; code: string | null; title: string; issuer: string | null; adoptedAt: string | null; effectiveFrom: string | null; status: string; url: string | null; summary: string | null; tags: string[]; revision: number; updatedAt: string }
 
-const KINDS: Array<[string, string]> = [["", "Все"], ["law", "Законы"], ["fso", "ФСО"], ["sro_standard", "Стандарты СРО"], ["methodology", "Методические материалы"], ["court", "Судебная практика"], ["literature", "Литература"]];
+const CATEGORIES: Array<{ key: string; label: string; kinds: string[] }> = [
+  { key: "all", label: "Все документы", kinds: [] },
+  { key: "law", label: "Федеральное законодательство", kinds: ["law"] },
+  { key: "fso", label: "ФСО", kinds: ["fso"] },
+  { key: "methodology", label: "Методические документы", kinds: ["methodology"] },
+  { key: "sro", label: "Стандарты СРО", kinds: ["sro_standard"] },
+  { key: "other", label: "Другие материалы", kinds: ["court", "literature"] },
+];
+const KIND_LABEL: Record<string, string> = { law: "Федеральный закон", fso: "Федеральный стандарт оценки", methodology: "Методический документ", sro_standard: "Стандарт СРО", court: "Судебная практика", literature: "Литература" };
 
 export function NormativeLibrary() {
-  const [q, setQ] = useState("");
-  const [kind, setKind] = useState("");
   const [docs, setDocs] = useState<Doc[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+  const [cat, setCat] = useState("all");
+  const [open, setOpen] = useState<string | null>(null);
+
   useEffect(() => {
     const t = setTimeout(() => {
-      const sp = new URLSearchParams();
-      if (q) sp.set("q", q);
-      if (kind) sp.set("kind", kind);
-      api.get<Doc[]>(`/api/normative?${sp}`).then(setDocs);
+      api.get<Doc[]>(`/api/normative${q ? `?q=${encodeURIComponent(q)}` : ""}`).then(setDocs).catch((e) => setError(errorText(e)));
     }, 200);
     return () => clearTimeout(t);
-  }, [q, kind]);
+  }, [q]);
+
+  const counts = useMemo(() => Object.fromEntries(CATEGORIES.map((c) => [c.key, (docs ?? []).filter((d) => !c.kinds.length || c.kinds.includes(d.kind)).length])), [docs]);
+  const current = CATEGORIES.find((c) => c.key === cat)!;
+  const view = (docs ?? []).filter((d) => !current.kinds.length || current.kinds.includes(d.kind));
+
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Нормативная база</h1>
-        <p className="text-muted">Законы, федеральные стандарты оценки, стандарты СРО, методические материалы и судебная практика. Библиотека обновляется без изменения кода.</p>
-      </div>
-      <div className="card flex flex-col gap-3 p-3 md:flex-row">
-        <input className="input flex-1" placeholder="Поиск по названию, номеру, содержанию" value={q} onChange={(e) => setQ(e.target.value)} />
-        <div className="flex flex-wrap gap-1">
-          {KINDS.map(([k, l]) => <button key={k} className={`btn ${kind === k ? "btn-primary" : "btn-ghost"}`} onClick={() => setKind(k)}>{l}</button>)}
-        </div>
-      </div>
-      <div className="space-y-2">
-        {docs?.map((d) => (
-          <div key={d.id} className="card p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="font-medium">{d.code && <span className="mr-2 text-brand">{d.code}</span>}{d.title}</div>
-                <div className="text-xs text-muted">{d.issuer}{d.adoptedAt ? ` · ${fmtDate(d.adoptedAt)}` : ""} · ред. {d.revision}</div>
-              </div>
-              <span className={`badge shrink-0 ${d.status === "active" ? "bg-green-50 text-ok" : "bg-zinc-100 text-zinc-500"}`}>{d.status === "active" ? "действует" : d.status === "repealed" ? "утратил силу" : "проект"}</span>
-            </div>
-            {d.summary && <p className="mt-2 text-sm text-zinc-600">{d.summary}</p>}
-            <div className="mt-2 flex flex-wrap gap-1">{d.tags.map((t) => <span key={t} className="badge bg-zinc-100 text-zinc-600">{t}</span>)}</div>
-            {d.url && <a href={d.url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs text-brand hover:underline">Официальный текст →</a>}
+    <div className="mx-auto max-w-[1360px]">
+      <PageHeader title="Нормативная база" description="Законы, федеральные стандарты оценки, стандарты СРО и методические материалы" />
+      <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <nav className="card h-fit p-2" aria-label="Категории">
+          {CATEGORIES.map((c) => (
+            <button
+              key={c.key}
+              onClick={() => setCat(c.key)}
+              className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-[13px] transition ${cat === c.key ? "bg-brand-soft font-medium text-brand" : "text-zinc-700 hover:bg-subtle"}`}
+            >
+              {c.label}
+              <span className="num text-[12px] text-muted">{docs ? counts[c.key] : ""}</span>
+            </button>
+          ))}
+        </nav>
+        <section className="card overflow-hidden">
+          <div className="border-b border-line p-3">
+            <SearchInput value={q} onChange={setQ} placeholder="Поиск по названию, номеру, содержанию и тегам" />
           </div>
-        ))}
-        {docs && !docs.length && <div className="card p-8 text-center text-muted">Ничего не найдено.</div>}
+          {error ? (
+            <div className="p-4"><Notice tone="err">{error}</Notice></div>
+          ) : !docs ? (
+            <div className="space-y-2 p-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-14" />)}</div>
+          ) : view.length === 0 ? (
+            <EmptyState icon="book" title={q ? "Ничего не найдено" : "В этой категории пока нет документов"}>
+              {q ? "Попробуйте другой запрос или выберите другую категорию." : "Библиотека пополняется без изменения программы — документы добавляет администратор."}
+            </EmptyState>
+          ) : (
+            <ul className="divide-y divide-line">
+              {view.map((d) => (
+                <li key={d.id}>
+                  <div className="flex flex-col gap-2 px-4 py-3 md:flex-row md:items-start">
+                    <Icon name="doc" size={18} className="mt-0.5 hidden text-muted md:block" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[13.5px] font-medium text-ink">{d.code && <span className="mr-2 text-brand">{d.code}</span>}{d.title}</div>
+                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[12px] text-muted">
+                        <span>{KIND_LABEL[d.kind] ?? d.kind}</span>
+                        {d.adoptedAt && <span className="num">от {fmtDate(d.adoptedAt)}</span>}
+                        {d.issuer && <span>{d.issuer}</span>}
+                      </div>
+                      {open === d.id && d.summary && <p className="mt-2 max-w-3xl text-[13px] text-zinc-700">{d.summary}</p>}
+                      {open === d.id && d.tags.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{d.tags.map((t) => <Badge key={t}>{t}</Badge>)}</div>}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Badge tone={d.status === "active" ? "ok" : "neutral"}>{d.status === "active" ? "Действует" : d.status === "repealed" ? "Утратил силу" : "Проект"}</Badge>
+                      {d.url ? (
+                        <a href={d.url} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm"><Icon name="external" size={13} />Открыть</a>
+                      ) : (
+                        <button className="btn btn-secondary btn-sm" onClick={() => setOpen(open === d.id ? null : d.id)}>{open === d.id ? "Свернуть" : "Подробнее"}</button>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
     </div>
   );

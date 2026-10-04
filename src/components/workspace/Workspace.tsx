@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, errorText } from "@/lib/api";
-import { STATUS } from "@/lib/labels";
 import { fmtDate, fmtNumber } from "@/core/format";
+import { buildChecklist, type Checklist } from "@/core/checks/catalog";
+import { Icon } from "@/components/ui/Icon";
+import { Notice, PageSkeleton, StatusBadge } from "@/components/ui/kit";
 import type { CalcState, Detail } from "./types";
 import { AssignmentTab } from "./AssignmentTab";
 import { PropertyTab } from "./PropertyTab";
@@ -15,7 +17,7 @@ import { ChecksTab } from "./ChecksTab";
 import { ReportTab } from "./ReportTab";
 import { HistoryTab } from "./HistoryTab";
 
-const TABS = [
+const STEPS = [
   ["assignment", "Задание"],
   ["property", "Объект"],
   ["comparables", "Аналоги"],
@@ -23,15 +25,46 @@ const TABS = [
   ["calculation", "Расчёт"],
   ["checks", "Проверки"],
   ["report", "Отчёт"],
-  ["history", "История"],
 ] as const;
-export type TabKey = (typeof TABS)[number][0];
+export type TabKey = (typeof STEPS)[number][0] | "history";
+const ALL_TABS: TabKey[] = [...STEPS.map(([k]) => k), "history"];
+
+type StepState = "done" | "warn" | "error" | "todo";
 
 export interface WsProps {
   detail: Detail;
   calc: CalcState | null;
+  checklist: Checklist | null;
   reload: () => Promise<void>;
   go: (t: TabKey) => void;
+}
+
+function stepStates(detail: Detail, calc: CalcState | null, cl: Checklist | null): Record<string, StepState> {
+  const st = (step: string): StepState => {
+    if (!cl) return "todo";
+    const items = cl.items.filter((i) => i.step === step);
+    if (items.some((i) => i.status === "error")) return "error";
+    if (items.some((i) => i.status === "warning")) return "warn";
+    return "done";
+  };
+  const included = detail.comparables.filter((c) => c.included).length;
+  const res = calc?.result;
+  return {
+    assignment: st("assignment"),
+    property: st("property"),
+    comparables: included === 0 ? "todo" : st("comparables"),
+    adjustments: included === 0 ? "todo" : st("adjustments"),
+    calculation: !res ? "todo" : st("calculation"),
+    checks: !cl ? "todo" : cl.errors ? "error" : cl.warnings ? "warn" : "done",
+    report: detail.reports.length && calc && !calc.isStale ? "done" : "todo",
+  };
+}
+
+function StepIcon({ state, index, active }: { state: StepState; index: number; active: boolean }) {
+  if (state === "done") return <span className={`flex h-5 w-5 items-center justify-center rounded-full ${active ? "bg-brand text-white" : "bg-ok-soft text-ok"}`}><Icon name="check" size={12} strokeWidth={2.6} /></span>;
+  if (state === "error") return <span className="flex h-5 w-5 items-center justify-center rounded-full bg-err text-[11px] font-bold text-white">!</span>;
+  if (state === "warn") return <span className="flex h-5 w-5 items-center justify-center rounded-full bg-warn text-[11px] font-bold text-white">!</span>;
+  return <span className={`num flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold ${active ? "bg-graphite text-white" : "bg-subtle text-muted"}`}>{index + 1}</span>;
 }
 
 export function Workspace({ id }: { id: string }) {
@@ -53,7 +86,7 @@ export function Workspace({ id }: { id: string }) {
   useEffect(() => {
     const fromHash = () => {
       const h = location.hash.replace("#", "") as TabKey;
-      if (TABS.some(([k]) => k === h)) setTab(h);
+      if (ALL_TABS.includes(h)) setTab(h);
     };
     fromHash();
     window.addEventListener("hashchange", fromHash);
@@ -61,60 +94,83 @@ export function Workspace({ id }: { id: string }) {
     return () => window.removeEventListener("hashchange", fromHash);
   }, [reload]);
 
+  const checklist = useMemo(() => (calc ? buildChecklist(calc.issues, !!calc.result) : null), [calc]);
+
   const go = (t: TabKey) => {
     setTab(t);
     history.replaceState(null, "", `#${t}`);
     window.scrollTo({ top: 0 });
   };
 
-  if (error) return <div className="rounded-md bg-red-50 p-4 text-err">{error}</div>;
-  if (!detail) return <div className="text-muted">Загрузка оценки…</div>;
+  if (error) return <Notice tone="err" title="Не удалось открыть оценку">{error}</Notice>;
+  if (!detail) return <PageSkeleton />;
 
   const p = detail.property;
-  const props: WsProps = { detail, calc, reload, go };
-  const included = detail.comparables.filter((c) => c.included).length;
-  const counts: Partial<Record<TabKey, React.ReactNode>> = {
-    comparables: included,
-    checks: calc ? (calc.errors ? <span className="text-err">{calc.errors}</span> : calc.warnings ? <span className="text-warn">{calc.warnings}</span> : "✓") : null,
-  };
+  const states = stepStates(detail, calc, checklist);
+  const props: WsProps = { detail, calc, checklist, reload, go };
+  const r = calc?.result;
+  const address = (p.address as string) || "Адрес не указан";
 
   return (
-    <div className="mx-auto max-w-7xl">
-      <div className="mb-3 text-xs text-muted"><Link href="/app" className="hover:text-brand">Оценки</Link> / № {detail.number}</div>
-      <div className="card mb-4 flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h1 className="truncate text-lg font-semibold">{(p.address as string) || "Адрес не указан"}</h1>
-            <span className={`badge ${STATUS[detail.status]?.cls}`}>{STATUS[detail.status]?.label}</span>
-          </div>
-          <div className="mt-0.5 text-xs tabular-nums text-muted">
-            № {detail.number} · КН {(p.cadastralNumber as string) || "—"} · {p.area ? `${fmtNumber(p.area as string, 2, true)} м²` : "площадь —"} · дата оценки {fmtDate(detail.valuationDate)}
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-5">
-          <div className="text-right">
-            <div className="text-xs text-muted">Рыночная стоимость</div>
-            <div className="num text-lg font-semibold">{calc?.result ? `${fmtNumber(calc.result.finalValue, 0)} ₽` : "—"}</div>
-            <div className="num text-xs text-muted">{calc?.result ? `${fmtNumber(calc.result.finalUnitPrice, 0)} ₽/м²` : ""}</div>
-          </div>
-          <button className="btn btn-primary" onClick={() => go(calc?.errors ? "checks" : "report")}>
-            {calc?.errors ? `Ошибок: ${calc.errors}` : "Сформировать отчёт"}
-          </button>
-        </div>
-      </div>
+    <div className="mx-auto max-w-[1360px]">
+      <nav className="mb-3 flex items-center gap-1.5 text-[12.5px] text-muted" aria-label="Навигация">
+        <Link href="/app" className="hover:text-ink">Оценки</Link>
+        <Icon name="chevronRight" size={12} />
+        <span className="text-zinc-700">№ {detail.number}</span>
+      </nav>
 
-      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-line">
-        {TABS.map(([k, l]) => (
-          <button
-            key={k}
-            onClick={() => go(k)}
-            className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm ${tab === k ? "border-brand font-medium text-brand" : "border-transparent text-zinc-600 hover:text-ink"}`}
-          >
-            {l}
-            {counts[k] !== undefined && counts[k] !== null && <span className="badge bg-zinc-100 text-zinc-600">{counts[k]}</span>}
-          </button>
-        ))}
-      </div>
+      <header className="card mb-4 overflow-hidden">
+        <div className="flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-[20px] font-semibold leading-tight tracking-[-0.01em] text-ink">
+                <span className="text-muted">{(p.objectType as string) || "Квартира"} — </span>{address}
+              </h1>
+              <StatusBadge status={detail.status} />
+            </div>
+            <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[12.5px]">
+              {[
+                ["Кадастровый номер", (p.cadastralNumber as string) || "—"],
+                ["Площадь", p.area ? `${fmtNumber(p.area as string, 2, true)} м²` : "—"],
+                ["Дата оценки", fmtDate(detail.valuationDate)],
+                ["№ отчёта", detail.number],
+              ].map(([k, v]) => (
+                <div key={k} className="flex gap-1.5"><dt className="text-muted">{k}</dt><dd className="num text-zinc-800">{v}</dd></div>
+              ))}
+            </dl>
+          </div>
+          <div className="flex shrink-0 items-center gap-5">
+            <div className="text-left lg:text-right">
+              <div className="text-[11.5px] uppercase tracking-[0.04em] text-muted">Рыночная стоимость</div>
+              <div className="num text-[22px] font-semibold leading-tight text-ink">{r ? `${fmtNumber(r.finalValue, 0)} ₽` : "—"}</div>
+              <div className="num text-[12px] text-muted">{r ? `${fmtNumber(r.finalUnitPrice, 0)} ₽/м²` : "расчёт не выполнен"}</div>
+            </div>
+            <button className="btn btn-secondary" onClick={() => go("history")} title="История изменений"><Icon name="history" size={15} /><span className="hidden sm:inline">История</span></button>
+          </div>
+        </div>
+
+        <ol className="flex overflow-x-auto border-t border-line bg-canvas/60 px-2" aria-label="Этапы оценки">
+          {STEPS.map(([k, l], i) => {
+            const active = tab === k;
+            const s = states[k];
+            return (
+              <li key={k} className="flex shrink-0 items-center">
+                <button
+                  onClick={() => go(k)}
+                  aria-current={active ? "step" : undefined}
+                  className={`relative flex items-center gap-2 px-3 py-3 text-[13px] transition ${active ? "font-semibold text-ink" : "text-zinc-600 hover:text-ink"}`}
+                >
+                  <StepIcon state={s} index={i} active={active} />
+                  {l}
+                  {k === "comparables" && <span className="num text-[11.5px] font-normal text-muted">{detail.comparables.filter((c) => c.included).length}</span>}
+                  {active && <span className="absolute inset-x-3 bottom-0 h-[2px] rounded-full bg-brand" />}
+                </button>
+                {i < STEPS.length - 1 && <Icon name="chevronRight" size={12} className="text-zinc-300" />}
+              </li>
+            );
+          })}
+        </ol>
+      </header>
 
       {tab === "assignment" && <AssignmentTab {...props} />}
       {tab === "property" && <PropertyTab {...props} />}

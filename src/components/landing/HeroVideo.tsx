@@ -11,7 +11,7 @@ export function HeroVideo() {
 
   return (
     <figure className="relative mx-auto w-full max-w-[640px]">
-      <div className="rounded-[14px] bg-zinc-900 p-[7px] shadow-[0_30px_60px_-25px_rgba(2,6,23,.55)] sm:p-[9px]">
+      <div className="rounded-[14px] bg-zinc-900 p-[7px] ring-1 ring-white/15 shadow-[0_30px_60px_-25px_rgba(2,6,23,.55)] sm:p-[9px]">
         <div className="relative aspect-video overflow-hidden rounded-[8px] bg-zinc-100">
           {playing && src ? (
             <video ref={ref} src={src} poster={poster} controls autoPlay playsInline className="h-full w-full object-cover" aria-label={title} />

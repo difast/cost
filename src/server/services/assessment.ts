@@ -7,6 +7,7 @@ import { stableStringify, sha256 } from "../stable";
 import { DEFAULT_SETTINGS, type CalcResult, type CalcSettings } from "@/core/calc/types";
 import { ENGINE_VERSION } from "@/core/calc/engine";
 import { runChecks, type CheckReport } from "@/core/checks";
+import { buildChecklist } from "@/core/checks/catalog";
 import { suggestForComparable, type DirectoryEdition } from "@/core/adjustments/suggest";
 import type { AssessmentSnapshot } from "@/core/snapshot";
 import { d } from "@/core/calc/decimal";
@@ -441,3 +442,26 @@ export async function updateWithAudit<T extends Record<string, unknown>>(opts: {
 }
 
 export type { CalcResult };
+
+/** Сводка проверок оценки для списка (пройдено / всего / ошибки / предупреждения). */
+export async function checkSummary(assessmentId: string) {
+  const snapshot = await buildSnapshot(assessmentId);
+  const r = runChecks(snapshot);
+  const cl = buildChecklist(r.issues, !!r.result);
+  return { passed: cl.passed, total: cl.total, errors: cl.errors, warnings: cl.warnings, finalValue: r.result?.finalValue ?? null };
+}
+
+/** Выполнить функцию для элементов с ограничением параллельности. */
+export async function mapLimit<T, R>(items: T[], limit: number, fn: (x: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let i = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (i < items.length) {
+        const idx = i++;
+        out[idx] = await fn(items[idx]);
+      }
+    }),
+  );
+  return out;
+}

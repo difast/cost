@@ -26,8 +26,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <form onSubmit={submit} className="card w-full max-w-sm space-y-4 p-6 shadow-sm">
+    <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
+      <form onSubmit={submit} className="card w-full max-w-sm space-y-4 p-7 shadow-[0_12px_40px_-20px_rgba(17,19,18,.25)]">
         <div>
           <Link href="/" className="text-xs font-semibold uppercase tracking-wider text-brand">Оценка.Про</Link>
           <h1 className="mt-1 text-xl font-semibold">{mode === "login" ? "Вход" : "Регистрация оценщика"}</h1>
@@ -46,8 +46,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           <label className="label">Пароль{mode === "register" && " (не менее 8 символов)"}</label>
           <input className="input" type="password" required minLength={mode === "register" ? 8 : 1} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} />
         </div>
-        {error && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-err">{error}</div>}
-        <button className="btn btn-primary w-full" disabled={busy}>{busy ? "Подождите…" : mode === "login" ? "Войти" : "Зарегистрироваться"}</button>
+        {error && <div className="rounded-md border border-err/25 bg-err-soft px-3 py-2 text-[13px] text-err" role="alert">{error}</div>}
+        <button className="btn btn-primary btn-lg w-full" disabled={busy}>{busy ? "Подождите…" : mode === "login" ? "Войти" : "Зарегистрироваться"}</button>
         <p className="text-center text-xs text-muted">
           {mode === "login" ? (
             <>Нет аккаунта? <Link className="text-brand hover:underline" href="/register">Зарегистрироваться</Link></>

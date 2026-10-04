@@ -21,6 +21,8 @@ export interface ProviderInfo {
   /** Подключён ли адаптер (есть договор/ключ). */
   configured: boolean;
   note?: string;
+  /** Для каких данных используется источник. */
+  usedFor?: string[];
 }
 
 export interface PropertyLookupQuery {
