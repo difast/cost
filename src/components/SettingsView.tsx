@@ -9,6 +9,7 @@ import type { CalcSettings } from "@/core/calc/types";
 import { Field, SaveBar } from "@/components/ui/Field";
 import { useDraft } from "@/components/ui/useDraft";
 import { Badge, KV, Notice, PageHeader, PageSkeleton, Panel, toast } from "@/components/ui/kit";
+import { WEIGHT_METHODS } from "@/core/calc/weights";
 
 interface Edition { id: string; name: string; edition: string; isDemo: boolean; isActive: boolean }
 interface Resp {
@@ -97,7 +98,7 @@ function Inner({ data, editions }: { data: Resp; editions: Edition[] }) {
               </select>
             </Field>
             <Field label="Порядок применения корректировок">{sel("adjustmentMode", [["sequential", "Последовательно (мультипликативно)"], ["staged", "1-я группа последовательно, 2-я — суммой"]])}</Field>
-            <Field label="Метод расчёта весов">{sel("weightMethod", [["inverse_gross", "Обратно валовой корректировке: 1/(1+Σ|корр|)"], ["linear_gross", "(S − sᵢ) / ((n − 1)·S)"], ["equal", "Равные веса"]])}</Field>
+            <Field label="Метод расчёта весов">{sel("weightMethod", (["inverse_gross", "linear_gross", "equal"] as const).map((m) => [m, `${WEIGHT_METHODS[m].label}: ${WEIGHT_METHODS[m].formula}`]))}</Field>
             <Field label="Округление итоговой стоимости">{sel("roundingStep", [["0", "Без округления"], ["100", "До 100 ₽"], ["1000", "До 1 000 ₽"], ["10000", "До 10 000 ₽"], ["100000", "До 100 000 ₽"]])}</Field>
             <Field label="Точность весов">{sel("weightDecimals", [["2", "2 знака"], ["3", "3 знака"], ["4", "4 знака"], ["5", "5 знаков"], ["6", "6 знаков"]])}</Field>
           </div>

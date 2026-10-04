@@ -10,6 +10,7 @@ import { amountInWords, fmtDate, fmtNumber, fmtPercent, fmtRub } from "../format
 import type { AssessmentSnapshot } from "../snapshot";
 import { fmtDistance, type InfrastructureSnapshot } from "../infrastructure";
 import type { ReportBlock, ReportDoc, TemplateDefinition } from "./model";
+import { WEIGHT_METHODS } from "../calc/weights";
 
 export interface ReportFile {
   data: string; // base64
@@ -244,15 +245,18 @@ const BUILTINS: Record<string, Builtin> = {
         header: ["Характеристика", "Объект оценки", ...comps.map((x) => x.label)],
         rows: [
           row("Источник информации", "—", (x) => [x.sourceName, x.sourceUrl].filter(Boolean).join(", ") || "—"),
+          ...(comps.some((x) => x.provider) ? [row("Получение данных", "—", (x) => (x.provider === "metrapi" ? `Metrapi (агрегатор объявлений), снимок данных на ${fmtDate(x.retrievedAt)}` : "Ввод оценщиком"))] : []),
           row("Дата предложения", fmtDate(s.assessment.valuationDate), (x) => fmtDate(x.offerDate ?? x.retrievedAt)),
           row("Дата получения данных", "—", (x) => fmtDate(x.retrievedAt)),
           row("Адрес", dash(s.property.address), (x) => dash(x.address)),
+          ...(comps.some((x) => x.distanceM !== undefined) ? [row("Расстояние до объекта оценки, м", "—", (x) => (x.distanceM !== undefined ? fmtNumber(x.distanceM, 0) : "—"))] : []),
           row("Цена предложения, ₽", "—", (x) => fmtNumber(x.price, 0)),
           row("Общая площадь, м²", fmtNumber(s.property.area ?? "0", 2, true), (x) => fmtNumber(x.area, 2, true)),
           row("Цена за 1 м², ₽", "—", (_x, i) => fmtNumber(res.comparables[i].unitPrice)),
           row("Количество комнат", dash(s.property.rooms), (x) => dash(x.rooms)),
           row("Этаж / этажность", `${dash(s.property.floor)} / ${dash(s.building.floors)}`, (x) => `${dash(x.floor)} / ${dash(x.floors)}`),
           row("Материал стен", wall(s.building.wallMaterial), (x) => wall(x.wallMaterial)),
+          ...(comps.some((x) => x.houseType) ? [row("Тип дома (по данным источника)", "—", (x) => dash(x.houseType))] : []),
           row("Год постройки", dash(s.building.yearBuilt), (x) => dash(x.yearBuilt)),
           row("Отделка", fin(s.property.finishing), (x) => fin(x.finishing)),
           row("Мебель", yesNo(s.property.furniture), (x) => yesNo(x.furniture)),
@@ -278,6 +282,10 @@ const BUILTINS: Record<string, Builtin> = {
           return a ? `${dash(a.subjectValue)} / ${dash(a.comparableValue)}` : "—";
         }),
       ]);
+      rows.push([`${name}, коэффициент K`, ...res.comparables.map((rc) => {
+        const st = rc.steps.find((x) => x.code === code);
+        return st ? fmtNumber(d(1).plus(st.value), 4) : "—";
+      })]);
       rows.push([`${name}, корректировка`, ...res.comparables.map((rc) => {
         const st = rc.steps.find((x) => x.code === code);
         return st ? fmtPercent(st.value, 2, true) : "—";
@@ -315,7 +323,9 @@ const BUILTINS: Record<string, Builtin> = {
         const f = factors.get(a.factorCode) ?? { name: a.factorName, refs: new Set<string>(), comments: [] };
         const rs = a.ruleSnapshot as { sourceName?: string; edition?: string; factor?: { reference?: string | null } } | null;
         if (rs?.sourceName) f.refs.add(`${rs.sourceName}, ред. ${rs.edition}${rs.factor?.reference ? `, ${rs.factor.reference}` : ""}`);
-        if (a.overridden && a.comment) f.comments.push(`${cp.label}: ${fmtPercent(a.value, 2, true)} (предложено ${a.suggestedValue !== null ? fmtPercent(a.suggestedValue, 2, true) : "—"}) — ${a.comment}`);
+        const when = a.overriddenAt ? ` (${fmtDate(a.overriddenAt)})` : "";
+        if (a.notRequired) f.comments.push(`${cp.label}: не требуется${when} — ${a.comment ?? "обоснование не указано"}`);
+        else if (a.overridden && a.comment) f.comments.push(`${cp.label}: ${fmtPercent(a.value, 2, true)} (рассчитано автоматически ${a.suggestedValue !== null ? fmtPercent(a.suggestedValue, 2, true) : "—"})${when} — ${a.comment}`);
         factors.set(a.factorCode, f);
       }
     }
@@ -342,14 +352,9 @@ const BUILTINS: Record<string, Builtin> = {
 
   weightsTable: (c) => {
     const r = c.result;
-    const methods: Record<string, string> = {
-      equal: "равные веса: w_i = 1 / n",
-      inverse_gross: "обратно пропорционально валовой корректировке: w_i = (1 / (1 + Σ|корр|_i)) / Σ_j(1 / (1 + Σ|корр|_j))",
-      linear_gross: "w_i = (S − s_i) / ((n − 1) · S), где s_i — валовая корректировка аналога, S = Σ s_i",
-      manual: "веса заданы оценщиком",
-    };
+    const m = WEIGHT_METHODS[r.settings.weightMethod];
     return [
-      { type: "paragraph", text: `Метод расчёта весов: ${methods[r.settings.weightMethod]}. Веса округлены до ${r.settings.weightDecimals} знаков методом наибольшего остатка; сумма весов равна ${fmtNumber(r.weightsSum, r.settings.weightDecimals)}.`, align: "justify" },
+      { type: "paragraph", text: `Метод расчёта весов: ${m.label.toLowerCase()}, ${m.formula}. ${m.explanation} Веса округлены до ${r.settings.weightDecimals} знаков методом наибольшего остатка; сумма весов равна ${fmtNumber(r.weightsSum, r.settings.weightDecimals)}.`, align: "justify" },
       {
         type: "table",
         small: true,

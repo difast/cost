@@ -57,7 +57,7 @@ describe("геокодер", () => {
   it("адрес → координаты; ключ и параметры передаются в запросе", async () => {
     respond(geoResp([{ name: "улица Новый Арбат, 24", pos: "37.587614 55.753083", formatted: "Москва, улица Новый Арбат, 24" }]));
     const r = await geocode("Москва, Новый Арбат, 24");
-    expect(r).toEqual({ lat: 55.753083, lon: 37.587614, formatted: "Москва, улица Новый Арбат, 24", kind: "house", precision: "exact" });
+    expect(r).toEqual({ lat: 55.753083, lon: 37.587614, formatted: "Москва, улица Новый Арбат, 24", kind: "house", precision: "exact", components: [] });
     const u = lastUrl();
     expect(u.searchParams.get("apikey")).toBe("test-key");
     expect(u.searchParams.get("format")).toBe("json");

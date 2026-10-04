@@ -12,6 +12,31 @@ export interface ObjectFeatures {
   metroDistanceM?: number | null;
   rights?: string | null;
   rooms?: number | null;
+  yearBuilt?: number | null;
+  livingArea?: string | null;
+  kitchenArea?: string | null;
+  /** Дополнительные признаки для новых факторов справочника (атрибут «field:<имя>»). */
+  extra?: Record<string, string | number | boolean | null | undefined>;
+}
+
+/** Переменные формул справочника: суффикс o — объект оценки, a — аналог. */
+export const FORMULA_VARIABLES = ["So", "Sa", "Fo", "Fa", "Ho", "Ha", "Ro", "Ra", "Yo", "Ya", "Mo", "Ma", "Lo", "La", "Ko", "Ka"] as const;
+export const FORMULA_VARIABLE_LABELS: Record<string, string> = {
+  S: "общая площадь, м²", F: "этаж", H: "этажность дома", R: "количество комнат", Y: "год постройки", M: "расстояние до метро, м", L: "жилая площадь, м²", K: "площадь кухни, м²",
+};
+
+export function formulaVars(subject: ObjectFeatures, comparable: ObjectFeatures): Record<string, string | number | null> {
+  const pick = (f: ObjectFeatures) => ({
+    S: f.area ?? null, F: f.floor ?? null, H: f.floors ?? null, R: f.rooms ?? null, Y: f.yearBuilt ?? null,
+    M: f.metroDistanceM ?? null, L: f.livingArea ?? null, K: f.kitchenArea ?? null,
+  });
+  const o = pick(subject), a = pick(comparable);
+  const out: Record<string, string | number | null> = {};
+  for (const k of Object.keys(o) as Array<keyof typeof o>) {
+    out[`${k}o`] = o[k];
+    out[`${k}a`] = a[k];
+  }
+  return out;
 }
 
 export const WALL_MATERIALS: Record<string, string> = {
@@ -88,8 +113,14 @@ export function categoryOf(
       return metroCategory(f.metroDistanceM, (params.buckets as MetroBucket[]) ?? []);
     case "rights":
       return f.rights ? (/собствен/i.test(f.rights) ? "ownership" : "other") : null;
-    default:
+    default: {
+      // Универсальный признак: значение поля как код категории — новые факторы без изменения кода.
+      if (attribute.startsWith("field:")) {
+        const v = f.extra?.[attribute.slice(6)];
+        return v === null || v === undefined || v === "" ? null : String(v);
+      }
       return null;
+    }
   }
 }
 
@@ -111,7 +142,14 @@ export function describeCategory(attribute: string, f: ObjectFeatures): string {
       return f.area ? `${f.area} м²` : "—";
     case "rights":
       return f.rights ?? "—";
-    default:
+    case "rooms":
+      return f.rooms !== null && f.rooms !== undefined ? String(f.rooms) : "—";
+    default: {
+      if (attribute.startsWith("field:")) {
+        const v = f.extra?.[attribute.slice(6)];
+        return v === null || v === undefined || v === "" ? "—" : String(v);
+      }
       return "—";
+    }
   }
 }

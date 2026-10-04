@@ -191,7 +191,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
   );
 }
 
-export function ConfirmModal({ open, title, children, confirmLabel = "Удалить", onConfirm, onClose, busy }: { open: boolean; title: ReactNode; children?: ReactNode; confirmLabel?: string; onConfirm: () => void; onClose: () => void; busy?: boolean }) {
+export function ConfirmModal({ open, title, children, confirmLabel = "Удалить", onConfirm, onClose, busy, tone = "danger" }: { open: boolean; title: ReactNode; children?: ReactNode; confirmLabel?: string; onConfirm: () => void; onClose: () => void; busy?: boolean; tone?: "danger" | "primary" }) {
   return (
     <Modal
       open={open}
@@ -201,7 +201,7 @@ export function ConfirmModal({ open, title, children, confirmLabel = "Удали
       footer={
         <>
           <button className="btn btn-secondary" onClick={onClose}>Отмена</button>
-          <button className="btn bg-err text-white hover:bg-[#a33024]" disabled={busy} onClick={onConfirm}>{confirmLabel}</button>
+          <button className={tone === "danger" ? "btn bg-err text-white hover:bg-[#a33024]" : "btn btn-primary"} disabled={busy} onClick={onConfirm}>{confirmLabel}</button>
         </>
       }
     >

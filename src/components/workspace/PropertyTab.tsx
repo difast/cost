@@ -7,14 +7,17 @@ import { useDraft } from "@/components/ui/useDraft";
 import { Icon } from "@/components/ui/Icon";
 import { ConfirmModal, Notice, Panel, toast } from "@/components/ui/kit";
 import { CONDITION_OPTIONS, FINISHING_OPTIONS, WALL_OPTIONS } from "@/lib/labels";
-import { fmtDate } from "@/core/format";
+import { fmtDate, fmtNumber } from "@/core/format";
 import type { InfrastructureSnapshot } from "@/core/infrastructure";
 import { NextStep, StepIssues } from "./common";
 import { InfrastructurePanel, mapUrl } from "./InfrastructurePanel";
+import { AddressInput } from "./AddressInput";
+import { EnvironmentMap, infraPoints, type MapPoint } from "./EnvironmentMap";
+import { STATUS_LABEL } from "./ComparableCard";
 import type { WsProps } from "./Workspace";
 import type { Provenance } from "./types";
 
-const P_KEYS = ["objectType", "address", "cadastralNumber", "area", "livingArea", "kitchenArea", "purpose", "rights", "rightHolders", "encumbrances", "rooms", "floor", "ceilingHeight", "finishing", "condition", "furniture", "balcony", "bathroom", "communications", "metroName", "metroDistanceM", "district", "description", "latitude", "longitude"] as const;
+const P_KEYS = ["objectType", "address", "cadastralNumber", "area", "livingArea", "kitchenArea", "purpose", "rights", "rightHolders", "encumbrances", "rooms", "floor", "ceilingHeight", "finishing", "condition", "furniture", "balcony", "bathroom", "communications", "metroName", "metroDistanceM", "district", "description", "latitude", "longitude", "fiasId"] as const;
 const B_KEYS = ["cadastralNumber", "yearBuilt", "floors", "wallMaterial", "series", "houseCondition", "elevators", "parking", "overhaulYear", "description"] as const;
 
 const pick = (o: Record<string, unknown>, keys: readonly string[]) => Object.fromEntries(keys.map((k) => [k, o[k] ?? null]));
@@ -125,6 +128,19 @@ export function PropertyTab({ detail, reload, checklist, go }: WsProps) {
     }
   }
 
+  const envPoints: MapPoint[] = [
+    ...(detail.property.latitude != null && detail.property.longitude != null
+      ? [{ id: "subject", kind: "subject" as const, lat: Number(detail.property.latitude), lon: Number(detail.property.longitude), title: "Объект оценки", lines: [String(detail.property.address ?? "")] }]
+      : []),
+    ...detail.comparables
+      .filter((c) => c.latitude != null && c.longitude != null)
+      .map((c) => ({
+        id: `cmp:${c.id}`, kind: "comparable" as const, status: c.status, caption: String(detail.comparables.indexOf(c) + 1), lat: Number(c.latitude), lon: Number(c.longitude),
+        title: `Аналог ${detail.comparables.indexOf(c) + 1} · ${STATUS_LABEL[c.status]}`,
+        lines: [c.address ?? "", c.distanceM !== null ? `${fmtNumber(c.distanceM, 0)} м от объекта` : ""].filter(Boolean),
+      })),
+    ...infraPoints((detail.property.infrastructure as InfrastructureSnapshot | null) ?? null),
+  ];
   const photos = detail.files.filter((f) => f.kind === "photo");
   const docs = detail.files.filter((f) => f.kind === "document" || f.kind === "egrn");
   const egrnSources = detail.sources.filter((s) => s.kind.startsWith("egrn"));
@@ -137,7 +153,7 @@ export function PropertyTab({ detail, reload, checklist, go }: WsProps) {
         <div className="space-y-4">
           <Panel title="Основные характеристики">
             <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Field label="Адрес" required className="sm:col-span-2 lg:col-span-3" source={src(pv, "address")}><TextInput d={P} k="address" set={sP} /></Field>
+              <Field label="Адрес" required className="sm:col-span-2 lg:col-span-3" source={src(pv, "address")}><AddressInput value={String(P.address ?? "")} onChange={(v) => sP("address", v)} onPick={(h) => { sP("address", h.fullAddress); sP("fiasId", h.guid); }} /></Field>
               <Field label="Вид объекта"><TextInput d={P} k="objectType" set={sP} /></Field>
               <Field label="Кадастровый номер" required source={src(pv, "cadastralNumber")}><TextInput d={P} k="cadastralNumber" set={sP} placeholder="77:01:0001001:1234" /></Field>
               <Field label="Общая площадь" required source={src(pv, "area")}><NumInput d={P} k="area" set={sP} suffix="м²" /></Field>
@@ -221,6 +237,15 @@ export function PropertyTab({ detail, reload, checklist, go }: WsProps) {
             onSearch={() => locate("infra")}
             onUseMetro={(name, m) => { sP("metroName", name.replace(/^метро\s+/i, "")); sP("metroDistanceM", m); toast("Метро подставлено в карточку — сохраните изменения"); }}
           />
+
+          <Panel title="Карта окружения" description="Объект оценки, аналоги и найденная инфраструктура — по уже полученным координатам" bodyClassName="p-3">
+            <EnvironmentMap
+              points={envPoints}
+              layers={["comparables", "infra"]}
+              height={360}
+              emptyText="Определите координаты объекта — карта окружения появится автоматически"
+            />
+          </Panel>
         </div>
 
         <div className="space-y-4">

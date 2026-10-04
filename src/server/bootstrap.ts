@@ -1,7 +1,7 @@
 // Идемпотентное начальное заполнение системных данных (справочник, шаблон, нормативка).
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
-import { DEMO_DIRECTORY, DEMO_FACTORS } from "./seed/directory";
+import { DEMO_DIRECTORY, DEMO_FACTORS, DEMO_METHODOLOGY } from "./seed/directory";
 import { NORMATIVE_SEED, NORMATIVE_SOURCE_URLS } from "./seed/normative";
 import { DEFAULT_TEMPLATE, DEFAULT_TEMPLATE_CODE } from "@/core/report/defaultTemplate";
 
@@ -36,6 +36,8 @@ async function seed() {
             maxValue: f.maxValue,
             params: (f.params ?? {}) as Prisma.InputJsonValue,
             description: f.description,
+            groupName: f.groupName,
+            methodology: DEMO_METHODOLOGY,
             categories: {
               create: (f.categories ?? []).map((c, i) => ({
                 code: c.code,
@@ -50,6 +52,15 @@ async function seed() {
         },
       },
     });
+  }
+
+  // Группы и методика демонстрационных показателей — дозаполнение для баз, созданных раньше
+  const demo = existing ?? (await prisma.adjustmentSource.findUnique({ where: { code_edition: { code: DEMO_DIRECTORY.code, edition: DEMO_DIRECTORY.edition } } }));
+  if (demo) {
+    for (const f of DEMO_FACTORS) {
+      await prisma.adjustmentFactor.updateMany({ where: { sourceId: demo.id, code: f.code, groupName: null }, data: { groupName: f.groupName ?? null } });
+      await prisma.adjustmentFactor.updateMany({ where: { sourceId: demo.id, code: f.code, methodology: null }, data: { methodology: DEMO_METHODOLOGY } });
+    }
   }
 
   const tpl = await prisma.reportTemplate.findUnique({ where: { code_version: { code: DEFAULT_TEMPLATE_CODE, version: 1 } } });

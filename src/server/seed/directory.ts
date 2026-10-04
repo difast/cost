@@ -16,6 +16,7 @@ export interface SeedFactor {
   maxValue?: string;
   params?: Record<string, unknown>;
   description?: string;
+  groupName?: string;
   categories?: Array<{ code: string; label: string; coefficient: string; min?: string; max?: string }>;
 }
 
@@ -32,12 +33,12 @@ export const DEMO_DIRECTORY = {
 
 export const DEMO_FACTORS: SeedFactor[] = [
   {
-    code: "bargain", name: "Скидка на торг", kind: "discount", stage: 1, sortOrder: 10,
+    code: "bargain", groupName: "Условия сделки и рынка", name: "Скидка на торг", kind: "discount", stage: 1, sortOrder: 10,
     value: "-0.05", minValue: "-0.08", maxValue: "-0.02",
     description: "Переход от цены предложения к цене сделки.",
   },
   {
-    code: "rights", name: "Передаваемые права", kind: "category", attribute: "rights", stage: 1, sortOrder: 20,
+    code: "rights", groupName: "Условия сделки и рынка", name: "Передаваемые права", kind: "category", attribute: "rights", stage: 1, sortOrder: 20,
     categories: [
       { code: "ownership", label: "Собственность", coefficient: "1" },
       { code: "other", label: "Иное право", coefficient: "1" },
@@ -45,22 +46,22 @@ export const DEMO_FACTORS: SeedFactor[] = [
     description: "При одинаковом объёме прав корректировка не требуется.",
   },
   {
-    code: "market_conditions", name: "Условия рынка (дата предложения)", kind: "manual", stage: 1, sortOrder: 30,
+    code: "market_conditions", groupName: "Условия сделки и рынка", name: "Условия рынка (дата предложения)", kind: "manual", stage: 1, sortOrder: 30,
     minValue: "-0.1", maxValue: "0.1",
     description: "Изменение цен между датой предложения и датой оценки.",
   },
   {
-    code: "location", name: "Местоположение", kind: "manual", stage: 2, sortOrder: 40,
+    code: "location", groupName: "Местоположение", name: "Местоположение", kind: "manual", stage: 2, sortOrder: 40,
     minValue: "-0.2", maxValue: "0.2",
     description: "Определяется оценщиком при различии в местоположении.",
   },
   {
-    code: "area", name: "Общая площадь", kind: "power", attribute: "area", stage: 2, sortOrder: 50,
+    code: "area", groupName: "Физические характеристики", name: "Общая площадь", kind: "power", attribute: "area", stage: 2, sortOrder: 50,
     params: { exponent: "-0.1" }, minValue: "-0.15", maxValue: "0.15",
     description: "Коэффициент торможения: (S объекта / S аналога)^b − 1.",
   },
   {
-    code: "floor", name: "Этаж расположения", kind: "category", attribute: "floor_category", stage: 2, sortOrder: 60,
+    code: "floor", groupName: "Физические характеристики", name: "Этаж расположения", kind: "category", attribute: "floor_category", stage: 2, sortOrder: 60,
     categories: [
       { code: "first", label: "Первый этаж", coefficient: "0.94", min: "0.92", max: "0.96" },
       { code: "middle", label: "Средний этаж", coefficient: "1", min: "1", max: "1" },
@@ -68,7 +69,7 @@ export const DEMO_FACTORS: SeedFactor[] = [
     ],
   },
   {
-    code: "wall_material", name: "Материал стен", kind: "category", attribute: "wall_material", stage: 2, sortOrder: 70,
+    code: "wall_material", groupName: "Физические характеристики", name: "Материал стен", kind: "category", attribute: "wall_material", stage: 2, sortOrder: 70,
     categories: [
       { code: "monolith", label: "Монолитный", coefficient: "1.05" },
       { code: "monolith_brick", label: "Монолитно-кирпичный", coefficient: "1.05" },
@@ -80,7 +81,7 @@ export const DEMO_FACTORS: SeedFactor[] = [
     ],
   },
   {
-    code: "house_condition", name: "Техническое состояние дома", kind: "category", attribute: "house_condition", stage: 2, sortOrder: 80,
+    code: "house_condition", groupName: "Физические характеристики", name: "Техническое состояние дома", kind: "category", attribute: "house_condition", stage: 2, sortOrder: 80,
     categories: [
       { code: "good", label: "Хорошее", coefficient: "1" },
       { code: "satisfactory", label: "Удовлетворительное", coefficient: "0.95" },
@@ -88,7 +89,7 @@ export const DEMO_FACTORS: SeedFactor[] = [
     ],
   },
   {
-    code: "finishing", name: "Состояние отделки", kind: "category", attribute: "finishing", stage: 2, sortOrder: 90,
+    code: "finishing", groupName: "Физические характеристики", name: "Состояние отделки", kind: "category", attribute: "finishing", stage: 2, sortOrder: 90,
     categories: [
       { code: "none", label: "Без отделки", coefficient: "0.85" },
       { code: "whitebox", label: "Предчистовая", coefficient: "0.9" },
@@ -99,14 +100,14 @@ export const DEMO_FACTORS: SeedFactor[] = [
     ],
   },
   {
-    code: "furniture", name: "Наличие мебели", kind: "category", attribute: "furniture", stage: 2, sortOrder: 100,
+    code: "furniture", groupName: "Физические характеристики", name: "Наличие мебели", kind: "category", attribute: "furniture", stage: 2, sortOrder: 100,
     categories: [
       { code: "no", label: "Без мебели", coefficient: "0.96" },
       { code: "yes", label: "С мебелью", coefficient: "1" },
     ],
   },
   {
-    code: "transport", name: "Транспортная доступность (метро)", kind: "category", attribute: "metro_distance", stage: 2, sortOrder: 110,
+    code: "transport", groupName: "Местоположение", name: "Транспортная доступность (метро)", kind: "category", attribute: "metro_distance", stage: 2, sortOrder: 110,
     params: {
       buckets: [
         { code: "m500", maxM: 500 },
@@ -123,3 +124,6 @@ export const DEMO_FACTORS: SeedFactor[] = [
     ],
   },
 ];
+
+/** Методика демонстрационных значений — показывается в интерфейсе и снимке корректировки. */
+export const DEMO_METHODOLOGY = "Демонстрационное значение: получено из анализа образца отчёта и типовых диапазонов практики, не является данными лицензированного источника. Перед использованием в отчёте требует проверки и обоснования оценщиком.";

@@ -94,6 +94,7 @@ export const buildingSchema = z.object({
 
 export const comparableSchema = z.object({
   included: z.boolean(),
+  status: z.enum(["use", "review", "exclude"]),
   position: int,
   sourceName: str,
   sourceUrl: z.string().trim().max(2000).url("Некорректная ссылка").nullish().or(z.literal("")).transform((v) => v || null),
@@ -110,6 +111,8 @@ export const adjustmentPatchSchema = z.object({
   percent: dec.optional(),
   comment: str.optional(),
   reset: z.boolean().optional(),
+  /** Фактор не применяется к аналогу (обязательное обоснование в comment). */
+  notRequired: z.boolean().optional(),
 });
 
 export const settingsSchema = z.object({

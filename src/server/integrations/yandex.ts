@@ -6,6 +6,9 @@
 // Ключ берётся только из окружения (YANDEX_API_KEY) и никогда не передаётся в браузер.
 
 import { HttpError } from "@/server/http";
+import { distanceM, type GeoPoint } from "@/core/geo";
+
+export { distanceM, type GeoPoint };
 
 const GEOCODER_URL = process.env.YANDEX_GEOCODER_URL || "https://geocode-maps.yandex.ru/1.x/";
 const SEARCH_URL = process.env.YANDEX_SEARCH_URL || "https://search-maps.yandex.ru/v1/";
@@ -19,7 +22,6 @@ const searchKey = () => process.env.YANDEX_SEARCH_API_KEY?.trim() || geocoderKey
 
 export const yandexConfigured = () => Boolean(geocoderKey());
 
-export interface GeoPoint { lat: number; lon: number }
 
 export interface GeocodeResult extends GeoPoint {
   /** Адрес в написании геокодера. */
@@ -28,6 +30,8 @@ export interface GeocodeResult extends GeoPoint {
   kind: string;
   /** Точность: exact, number, near, range, street, other. */
   precision: string;
+  /** Компоненты адреса: province (субъект), area, locality (населённый пункт), district, street, house… */
+  components: Array<{ kind: string; name: string }>;
 }
 
 export interface Place extends GeoPoint {
@@ -64,23 +68,13 @@ async function getJson(url: URL, what: string): Promise<unknown> {
   }
 }
 
-/** Расстояние по прямой (формула гаверсинусов), м. */
-export function distanceM(a: GeoPoint, b: GeoPoint): number {
-  const R = 6_371_008.8;
-  const rad = Math.PI / 180;
-  const dLat = (b.lat - a.lat) * rad;
-  const dLon = (b.lon - a.lon) * rad;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;
-  return Math.round(2 * R * Math.asin(Math.min(1, Math.sqrt(h))));
-}
-
 // ── Геокодер ────────────────────────────────────────────────────────────────
 
 interface GeoObject {
   name?: string;
   description?: string;
   Point?: { pos?: string };
-  metaDataProperty?: { GeocoderMetaData?: { kind?: string; precision?: string; text?: string; Address?: { formatted?: string } } };
+  metaDataProperty?: { GeocoderMetaData?: { kind?: string; precision?: string; text?: string; Address?: { formatted?: string; Components?: Array<{ kind?: string; name?: string }> } } };
 }
 
 function parsePos(pos: string | undefined): GeoPoint | null {
@@ -108,7 +102,8 @@ function toGeocodeResult(g: GeoObject): GeocodeResult | null {
   const pt = parsePos(g.Point?.pos);
   if (!pt) return null;
   const meta = g.metaDataProperty?.GeocoderMetaData;
-  return { ...pt, formatted: meta?.Address?.formatted || meta?.text || g.name || "", kind: meta?.kind ?? "other", precision: meta?.precision ?? "other" };
+  const components = (meta?.Address?.Components ?? []).filter((c) => c.kind && c.name).map((c) => ({ kind: c.kind!, name: c.name! }));
+  return { ...pt, formatted: meta?.Address?.formatted || meta?.text || g.name || "", kind: meta?.kind ?? "other", precision: meta?.precision ?? "other", components };
 }
 
 /** Прямое геокодирование: адрес → координаты. */

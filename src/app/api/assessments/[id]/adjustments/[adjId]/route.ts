@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { api, body, ok, notFound, HttpError } from "@/server/http";
 import { requireUser } from "@/server/auth";
@@ -17,9 +18,16 @@ export const PATCH = api(async (req, { params }: P) => {
   if (!adj) throw notFound("Корректировка");
   const data = await body(req, adjustmentPatchSchema);
 
-  if (data.reset) {
+  if (data.notRequired === true) {
+    if (!data.comment?.trim()) throw new HttpError(400, "Укажите обоснование, почему фактор не требуется");
+    await prisma.adjustment.update({ where: { id: aid }, data: { value: 0, notRequired: true, overridden: false, comment: data.comment, overriddenById: u.id, overriddenAt: new Date(), basisSnapshot: { subjectValue: adj.subjectValue, comparableValue: adj.comparableValue, suggestedValue: adj.suggestedValue?.toString() ?? null } } });
+    await logEvent({ assessmentId: id, userId: u.id, action: "update", entity: "adjustment", entityId: aid, summary: `${adj.factorName}: отмечено «Не требуется» (${data.comment})`, diff: { value: [adj.value.toString(), "0"], notRequired: [adj.notRequired, true], comment: [adj.comment, data.comment] } });
+    return ok({ ok: true });
+  }
+
+  if (data.reset || data.notRequired === false) {
     const value = adj.suggestedValue ?? d(0);
-    await prisma.adjustment.update({ where: { id: aid }, data: { value, overridden: false, comment: null } });
+    await prisma.adjustment.update({ where: { id: aid }, data: { value, overridden: false, notRequired: false, comment: null, overriddenById: null, overriddenAt: null, basisSnapshot: Prisma.DbNull } });
     await logEvent({ assessmentId: id, userId: u.id, action: "update", entity: "adjustment", entityId: aid, summary: `${adj.factorName}: возврат к значению справочника ${fmtPercent(value.toString())}` });
     return ok({ ok: true });
   }
@@ -32,7 +40,15 @@ export const PATCH = api(async (req, { params }: P) => {
   }
   const overridden = adj.suggestedValue === null ? !d(value).isZero() || !!data.comment : !d(value).eq(adj.suggestedValue);
   const comment = data.comment !== undefined ? data.comment : adj.comment;
-  const after = await prisma.adjustment.update({ where: { id: aid }, data: { value, overridden, comment } });
+  // при ручном изменении фиксируются автор, дата и характеристики, на основании которых оно сделано;
+  // исходное автоматическое значение остаётся в suggestedValue
+  const valueChanged = !d(adj.value).eq(value);
+  const audit = overridden
+    ? valueChanged || !adj.overriddenAt
+      ? { overriddenById: u.id, overriddenAt: new Date(), basisSnapshot: { subjectValue: adj.subjectValue, comparableValue: adj.comparableValue, suggestedValue: adj.suggestedValue?.toString() ?? null } }
+      : {}
+    : { overriddenById: null, overriddenAt: null, basisSnapshot: Prisma.DbNull };
+  const after = await prisma.adjustment.update({ where: { id: aid }, data: { value, overridden, comment, notRequired: false, ...audit } });
   if (!d(adj.value).eq(value) || adj.comment !== comment) {
     await logEvent({
       assessmentId: id,

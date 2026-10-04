@@ -10,8 +10,10 @@ import { ENGINE_VERSION } from "@/core/calc/engine";
 import { runChecks, type CheckReport } from "@/core/checks";
 import { buildChecklist } from "@/core/checks/catalog";
 import { suggestForComparable, type DirectoryEdition } from "@/core/adjustments/suggest";
-import type { AssessmentSnapshot } from "@/core/snapshot";
+import type { AssessmentSnapshot, SnapshotAdjustment } from "@/core/snapshot";
 import type { InfrastructureSnapshot } from "@/core/infrastructure";
+import type { ObjectFeatures } from "@/core/adjustments/attributes";
+import { distanceM, toPoint } from "@/core/geo";
 import { d } from "@/core/calc/decimal";
 
 const iso = (v: Date | null | undefined) => (v ? v.toISOString() : null);
@@ -78,19 +80,28 @@ export async function createAssessment(userId: string, input: { address?: string
 
 export async function getDetail(id: string, userId: string) {
   await getOwned(id, userId);
-  return prisma.assessment.findUniqueOrThrow({
+  const a = await prisma.assessment.findUniqueOrThrow({
     where: { id },
     include: {
       property: true,
       building: true,
       adjustmentSource: true,
-      comparables: { orderBy: [{ position: "asc" }, { createdAt: "asc" }], include: { adjustments: { orderBy: [{ stage: "asc" }, { sortOrder: "asc" }] } } },
+      // исходные данные поставщика в интерфейс не отдаются целиком — только нормализованный снимок
+      comparables: { omit: { rawData: true }, orderBy: [{ position: "asc" }, { createdAt: "asc" }], include: { adjustments: { orderBy: [{ stage: "asc" }, { sortOrder: "asc" }] } } },
       sources: { orderBy: { createdAt: "desc" } },
       calculation: { include: { versions: { orderBy: { versionNumber: "desc" }, select: { id: true, versionNumber: true, createdAt: true, inputHash: true, engineVersion: true, note: true, result: true } } } },
       reports: { orderBy: { createdAt: "desc" }, include: { calculationVersion: { select: { versionNumber: true } } } },
       files: { select: { id: true, kind: true, filename: true, mime: true, size: true, caption: true, createdAt: true }, where: { kind: { not: "report" } }, orderBy: { createdAt: "asc" } },
     },
   });
+  // кто изменял корректировки вручную
+  const ids = [...new Set(a.comparables.flatMap((c) => c.adjustments.map((x) => x.overriddenById)).filter((x): x is string => !!x))];
+  const users = ids.length ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, email: true, appraiser: { select: { fullName: true } } } }) : [];
+  const names = new Map(users.map((u) => [u.id, u.appraiser?.fullName || u.email]));
+  return {
+    ...a,
+    comparables: a.comparables.map((c) => ({ ...c, adjustments: c.adjustments.map((x) => ({ ...x, overriddenByName: x.overriddenById ? names.get(x.overriddenById) ?? null : null })) })),
+  };
 }
 
 // ───────────── справочник
@@ -121,6 +132,11 @@ export async function loadEdition(sourceId: string): Promise<DirectoryEdition> {
       params: (f.params ?? {}) as Record<string, unknown>,
       reference: f.reference,
       enabled: f.enabled,
+      groupName: f.groupName,
+      region: f.region,
+      methodology: f.methodology,
+      comment: f.comment,
+      actualDate: iso(f.actualDate),
       categories: f.categories.map((c) => ({
         code: c.code,
         label: c.label,
@@ -141,32 +157,13 @@ export async function syncAdjustments(assessmentId: string) {
     where: { id: assessmentId },
     include: { property: true, building: true, comparables: { include: { adjustments: true } } },
   });
+  await syncDistances(a);
   if (!a.adjustmentSourceId) return;
   const edition = await loadEdition(a.adjustmentSourceId);
-  const subject = {
-    area: decStr(a.property?.area),
-    floor: a.property?.floor,
-    floors: a.building?.floors,
-    wallMaterial: a.building?.wallMaterial,
-    finishing: a.property?.finishing,
-    furniture: a.property?.furniture,
-    houseCondition: a.building?.houseCondition,
-    metroDistanceM: a.property?.metroDistanceM,
-    rights: a.property?.rights,
-  };
+  const subject = subjectFeatures(a.property, a.building);
   await prisma.$transaction(async (tx) => {
     for (const c of a.comparables) {
-      const suggestions = suggestForComparable(edition, subject, {
-        area: c.area.toString(),
-        floor: c.floor,
-        floors: c.floors,
-        wallMaterial: c.wallMaterial,
-        finishing: c.finishing,
-        furniture: c.furniture,
-        houseCondition: c.houseCondition,
-        metroDistanceM: c.metroDistanceM,
-        rights: c.rights,
-      });
+      const suggestions = suggestForComparable(edition, subject, comparableFeatures(c));
       const codes = new Set(suggestions.map((s) => s.factorCode));
       for (const s of suggestions) {
         const existing = c.adjustments.find((x) => x.factorCode === s.factorCode);
@@ -179,13 +176,14 @@ export async function syncAdjustments(assessmentId: string) {
           suggestedValue: s.suggestedValue,
           minValue: s.minValue,
           maxValue: s.maxValue,
-          ruleSnapshot: { ...s.ruleSnapshot, explanation: s.explanation } as Prisma.InputJsonValue,
+          ruleSnapshot: { ...s.ruleSnapshot, explanation: s.explanation, coefficient: s.coefficient } as Prisma.InputJsonValue,
         };
         if (!existing) {
           await tx.adjustment.create({
             data: { ...common, assessmentId, comparableId: c.id, factorCode: s.factorCode, value: s.suggestedValue ?? "0" },
           });
-        } else if (existing.overridden) {
+        } else if (existing.overridden || existing.notRequired) {
+          // значение, заданное оценщиком, не перезаписывается — обновляются только данные справочника
           await tx.adjustment.update({ where: { id: existing.id }, data: common });
         } else {
           await tx.adjustment.update({ where: { id: existing.id }, data: { ...common, value: s.suggestedValue ?? "0" } });
@@ -195,6 +193,61 @@ export async function syncAdjustments(assessmentId: string) {
       if (stale.length) await tx.adjustment.deleteMany({ where: { id: { in: stale } } });
     }
   });
+}
+
+type PropertyRow = Awaited<ReturnType<typeof prisma.property.findFirst>>;
+type BuildingRow = Awaited<ReturnType<typeof prisma.building.findFirst>>;
+type ComparableRow = Awaited<ReturnType<typeof prisma.comparable.findFirstOrThrow>>;
+
+/** Признаки объекта оценки для справочника корректировок. */
+export function subjectFeatures(p: PropertyRow, b: BuildingRow): ObjectFeatures {
+  return {
+    area: decStr(p?.area),
+    floor: p?.floor,
+    floors: b?.floors,
+    wallMaterial: b?.wallMaterial,
+    finishing: p?.finishing,
+    furniture: p?.furniture,
+    houseCondition: b?.houseCondition,
+    metroDistanceM: p?.metroDistanceM,
+    rights: p?.rights,
+    rooms: p?.rooms,
+    yearBuilt: b?.yearBuilt,
+    livingArea: decStr(p?.livingArea),
+    kitchenArea: decStr(p?.kitchenArea),
+  };
+}
+
+/** Признаки аналога для справочника корректировок. */
+export function comparableFeatures(c: ComparableRow): ObjectFeatures {
+  const n = (c.normalized ?? {}) as { livingArea?: number | null; kitchenArea?: number | null };
+  return {
+    area: c.area.toString(),
+    floor: c.floor,
+    floors: c.floors,
+    wallMaterial: c.wallMaterial,
+    finishing: c.finishing,
+    furniture: c.furniture,
+    houseCondition: c.houseCondition,
+    metroDistanceM: c.metroDistanceM,
+    rights: c.rights,
+    rooms: c.rooms,
+    yearBuilt: c.yearBuilt,
+    livingArea: n.livingArea != null ? String(n.livingArea) : null,
+    kitchenArea: n.kitchenArea != null ? String(n.kitchenArea) : null,
+    extra: (c.attributes ?? {}) as ObjectFeatures["extra"],
+  };
+}
+
+/** Расстояние от объекта оценки до каждого аналога по координатам (по прямой). */
+async function syncDistances(a: { property: PropertyRow; comparables: ComparableRow[] }) {
+  const center = toPoint(a.property?.latitude, a.property?.longitude);
+  for (const c of a.comparables) {
+    const pt = toPoint(c.latitude, c.longitude);
+    const dist = center && pt ? distanceM(center, pt) : null;
+    if (dist !== c.distanceM) await prisma.comparable.update({ where: { id: c.id }, data: { distanceM: dist } });
+    c.distanceM = dist;
+  }
 }
 
 // ───────────── снимок
@@ -375,7 +428,20 @@ export async function buildSnapshot(assessmentId: string): Promise<AssessmentSna
         overridden: x.overridden,
         comment: x.comment,
         ruleSnapshot: (x.ruleSnapshot ?? null) as Record<string, unknown> | null,
+        ...(x.notRequired ? { notRequired: true as const } : {}),
+        ...(x.overriddenAt ? { overriddenAt: x.overriddenAt.toISOString() } : {}),
+        ...(x.overriddenById ? { overriddenById: x.overriddenById } : {}),
+        ...(x.basisSnapshot ? { basisSnapshot: x.basisSnapshot as unknown as NonNullable<SnapshotAdjustment["basisSnapshot"]> } : {}),
       })),
+      ...(c.status === "review" ? { status: "review" as const } : {}),
+      ...(c.provider ? { provider: c.provider } : {}),
+      ...(c.externalId ? { externalId: c.externalId } : {}),
+      ...(c.houseType ? { houseType: c.houseType } : {}),
+      ...(c.latitude != null && c.longitude != null ? { latitude: decStr(c.latitude)!, longitude: decStr(c.longitude)! } : {}),
+      ...(c.distanceM != null ? { distanceM: c.distanceM } : {}),
+      ...(c.photoUrl ? { photoUrl: c.photoUrl } : {}),
+      ...(c.sourceUpdatedAt ? { sourceUpdatedAt: c.sourceUpdatedAt.toISOString() } : {}),
+      ...(c.normalized ? { normalized: c.normalized as Record<string, unknown> } : {}),
     })),
     sources: a.sources.map((s) => ({
       id: s.id,

@@ -16,7 +16,24 @@ export interface AdjustmentRow {
   maxValue: string | null;
   overridden: boolean;
   comment: string | null;
-  ruleSnapshot: { explanation?: string; sourceName?: string; edition?: string; isDemo?: boolean } | null;
+  ruleSnapshot: RuleSnapshot | null;
+  notRequired: boolean;
+  overriddenById: string | null;
+  overriddenByName: string | null;
+  overriddenAt: string | null;
+  basisSnapshot: { subjectValue: string | null; comparableValue: string | null; suggestedValue: string | null } | null;
+}
+
+export interface RuleSnapshot {
+  explanation?: string;
+  sourceName?: string;
+  sourceCode?: string;
+  edition?: string;
+  actualDate?: string | null;
+  isDemo?: boolean;
+  coefficient?: string | null;
+  expression?: string;
+  factor?: { code?: string; kind?: string; attribute?: string | null; reference?: string | null; groupName?: string | null; region?: string | null; methodology?: string | null; actualDate?: string | null };
 }
 
 export interface ComparableRow {
@@ -44,6 +61,20 @@ export interface ComparableRow {
   description: string | null;
   screenshotFileId: string | null;
   adjustments: AdjustmentRow[];
+  status: "use" | "review" | "exclude";
+  provider: string | null;
+  externalId: string | null;
+  houseType: string | null;
+  region: string | null;
+  city: string | null;
+  district: string | null;
+  latitude: string | null;
+  longitude: string | null;
+  distanceM: number | null;
+  photoUrl: string | null;
+  sourceUpdatedAt: string | null;
+  normalized: Record<string, unknown> | null;
+  provenance: Provenance;
 }
 
 export type Provenance = Record<string, { source?: string; title?: string; at?: string }>;

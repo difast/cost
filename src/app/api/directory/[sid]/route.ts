@@ -27,6 +27,9 @@ const metaSchema = z.object({
   licenseNote: z.string().max(2000).nullable(),
   url: z.string().max(1000).nullable(),
   isActive: z.boolean(),
+  /** Снять пометку «демонстрационный» — только с подтверждением, что значения проверены по источнику. */
+  isDemo: z.boolean(),
+  confirmVerified: z.boolean(),
 }).partial();
 
 export const PATCH = api(async (req, { params }: Params<"sid">) => {
@@ -34,7 +37,8 @@ export const PATCH = api(async (req, { params }: Params<"sid">) => {
   const { sid } = await params;
   const s = await load(sid, u.id);
   if (s.ownerId !== u.id) throw new HttpError(403, "Системный справочник нельзя изменять — создайте собственную редакцию");
-  const data = await body(req, metaSchema);
+  const { confirmVerified, ...data } = await body(req, metaSchema);
+  if (data.isDemo === false && s.isDemo && !confirmVerified) throw new HttpError(400, "Подтвердите, что значения справочника проверены и подтверждены источником");
   const updated = await prisma.adjustmentSource.update({
     where: { id: sid },
     data: { ...data, actualDate: data.actualDate === undefined ? undefined : data.actualDate ? new Date(`${data.actualDate.slice(0, 10)}T00:00:00Z`) : null },

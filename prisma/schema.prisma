@@ -16,23 +16,23 @@ datasource db {
 // ───────────────────────────── Пользователи и организации
 
 model User {
-  id             String        @id @default(cuid())
-  email          String        @unique
+  id             String            @id @default(cuid())
+  email          String            @unique
   passwordHash   String
   name           String?
-  role           String        @default("appraiser") // appraiser | admin
-  plan           String        @default("trial")     // trial | basic | pro | team | corporate
+  role           String            @default("appraiser") // appraiser | admin
+  plan           String            @default("trial") // trial | basic | pro | team | corporate
   /// Системные настройки пользователя: умолчания для новых оценок и пороги контроля.
-  settings       Json          @default("{}")
+  settings       Json              @default("{}")
   organizationId String?
-  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organization   Organization?     @relation(fields: [organizationId], references: [id])
   appraiser      Appraiser?
   sessions       Session[]
   assessments    Assessment[]
   events         AssessmentEvent[]
   files          StoredFile[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 }
 
 model Session {
@@ -57,69 +57,69 @@ model Organization {
 
 /// Постоянные данные оценщика, подставляются в каждый отчёт.
 model Appraiser {
-  id                     String    @id @default(cuid())
-  userId                 String    @unique
-  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fullName               String    @default("")
-  position               String?
-  phone                  String?
-  email                  String?
-  postalAddress          String?
-  education              String?
-  experienceYears        Int?
-  sroName                String?
-  sroRegistryNumber      String?
-  sroMembershipDate      DateTime?
-  sroAddress             String?
-  qualificationCertNumber String?
-  qualificationCertDate  DateTime?
-  qualificationCertValidUntil DateTime?
-  qualificationArea      String?   @default("Оценка недвижимости")
-  insuranceCompany       String?
-  insurancePolicyNumber  String?
-  insuranceSum           Decimal?  @db.Decimal(18, 2)
-  insuranceValidFrom     DateTime?
-  insuranceValidUntil    DateTime?
+  id                             String    @id @default(cuid())
+  userId                         String    @unique
+  user                           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName                       String    @default("")
+  position                       String?
+  phone                          String?
+  email                          String?
+  postalAddress                  String?
+  education                      String?
+  experienceYears                Int?
+  sroName                        String?
+  sroRegistryNumber              String?
+  sroMembershipDate              DateTime?
+  sroAddress                     String?
+  qualificationCertNumber        String?
+  qualificationCertDate          DateTime?
+  qualificationCertValidUntil    DateTime?
+  qualificationArea              String?   @default("Оценка недвижимости")
+  insuranceCompany               String?
+  insurancePolicyNumber          String?
+  insuranceSum                   Decimal?  @db.Decimal(18, 2)
+  insuranceValidFrom             DateTime?
+  insuranceValidUntil            DateTime?
   // Юридическое лицо, с которым оценщик заключил трудовой договор (если есть)
-  legalEntityName        String?
-  legalEntityInn         String?
-  legalEntityOgrn        String?
-  legalEntityAddress     String?
-  legalEntityInsuranceCompany String?
-  legalEntityInsurancePolicy  String?
-  legalEntityInsuranceSum     Decimal? @db.Decimal(18, 2)
+  legalEntityName                String?
+  legalEntityInn                 String?
+  legalEntityOgrn                String?
+  legalEntityAddress             String?
+  legalEntityInsuranceCompany    String?
+  legalEntityInsurancePolicy     String?
+  legalEntityInsuranceSum        Decimal?  @db.Decimal(18, 2)
   legalEntityInsuranceValidUntil DateTime?
-  bankDetails            String?
-  signatureFileId        String?
-  updatedAt              DateTime  @updatedAt
+  bankDetails                    String?
+  signatureFileId                String?
+  updatedAt                      DateTime  @updatedAt
 }
 
 // ───────────────────────────── Оценка
 
 model Assessment {
-  id                 String    @id @default(cuid())
+  id                 String            @id @default(cuid())
   ownerId            String
-  owner              User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner              User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   number             String
-  status             String    @default("draft") // draft | in_progress | review | completed | archived
-  propertyType       String    @default("apartment")
-  approach           String    @default("comparative")
+  status             String            @default("draft") // draft | in_progress | review | completed | archived
+  propertyType       String            @default("apartment")
+  approach           String            @default("comparative")
   // Задание на оценку
   customerName       String?
   customerDetails    String?
-  basis              String?   // основание для проведения оценки
+  basis              String? // основание для проведения оценки
   contractNumber     String?
   contractDate       DateTime?
-  purpose            String?   // цель оценки
-  intendedUse        String?   // предполагаемое использование результата
-  valueType          String?   @default("Рыночная стоимость")
-  rightsAssessed     String?   @default("Право собственности")
+  purpose            String? // цель оценки
+  intendedUse        String? // предполагаемое использование результата
+  valueType          String?           @default("Рыночная стоимость")
+  rightsAssessed     String?           @default("Право собственности")
   valuationDate      DateTime?
   inspectionDate     DateTime?
   reportDate         DateTime?
   assumptions        String?
   limitingConditions String?
-  marketAnalysis     String?   // анализ рынка (текст оценщика)
+  marketAnalysis     String? // анализ рынка (текст оценщика)
   // Справочник корректировок (редакция), действующий для этой оценки
   adjustmentSourceId String?
   adjustmentSource   AdjustmentSource? @relation(fields: [adjustmentSourceId], references: [id])
@@ -130,51 +130,52 @@ model Assessment {
   sources            Source[]
   marketData         MarketData[]
   calculation        Calculation?
+  listingSearches    ListingSearch[]
   reports            Report[]
   events             AssessmentEvent[]
   files              StoredFile[]
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
   @@index([ownerId, updatedAt])
 }
 
 /// Объект оценки (квартира). provenance: { field: { sourceId, at, note } }
 model Property {
-  id               String     @id @default(cuid())
-  assessmentId     String     @unique
-  assessment       Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  objectType       String     @default("Квартира")
-  address          String?
-  fiasId           String?
-  cadastralNumber  String?
-  area             Decimal?   @db.Decimal(12, 2)
-  livingArea       Decimal?   @db.Decimal(12, 2)
-  kitchenArea      Decimal?   @db.Decimal(12, 2)
-  purpose          String?    @default("Жилое")
-  rights           String?    @default("Собственность")
-  rightHolders     String?
-  encumbrances     String?
-  rooms            Int?
-  floor            Int?
-  ceilingHeight    Decimal?   @db.Decimal(5, 2)
-  finishing        String?    // none | rough | whitebox | standard | improved | designer
-  condition        String?    // состояние квартиры (текст)
-  furniture        Boolean?
-  balcony          String?
-  bathroom         String?
-  communications   String?
-  metroName        String?
-  metroDistanceM   Int?
-  district         String?
-  description      String?
+  id              String     @id @default(cuid())
+  assessmentId    String     @unique
+  assessment      Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  objectType      String     @default("Квартира")
+  address         String?
+  fiasId          String?
+  cadastralNumber String?
+  area            Decimal?   @db.Decimal(12, 2)
+  livingArea      Decimal?   @db.Decimal(12, 2)
+  kitchenArea     Decimal?   @db.Decimal(12, 2)
+  purpose         String?    @default("Жилое")
+  rights          String?    @default("Собственность")
+  rightHolders    String?
+  encumbrances    String?
+  rooms           Int?
+  floor           Int?
+  ceilingHeight   Decimal?   @db.Decimal(5, 2)
+  finishing       String? // none | rough | whitebox | standard | improved | designer
+  condition       String? // состояние квартиры (текст)
+  furniture       Boolean?
+  balcony         String?
+  bathroom        String?
+  communications  String?
+  metroName       String?
+  metroDistanceM  Int?
+  district        String?
+  description     String?
   /// Координаты объекта (WGS 84). Источник — в provenance (геокодер или ручной ввод).
-  latitude         Decimal?   @db.Decimal(9, 6)
-  longitude        Decimal?   @db.Decimal(9, 6)
+  latitude        Decimal?   @db.Decimal(9, 6)
+  longitude       Decimal?   @db.Decimal(9, 6)
   /// Снимок ближайшей инфраструктуры, полученной из картографического сервиса (для отчёта).
-  infrastructure   Json?
-  provenance       Json       @default("{}")
-  updatedAt        DateTime   @updatedAt
+  infrastructure  Json?
+  provenance      Json       @default("{}")
+  updatedAt       DateTime   @updatedAt
 }
 
 /// Здание, в котором расположен объект (копия на уровне оценки — для воспроизводимости).
@@ -185,9 +186,9 @@ model Building {
   cadastralNumber String?
   yearBuilt       Int?
   floors          Int?
-  wallMaterial    String?    // panel | brick | monolith | monolith_brick | block | wood | other
+  wallMaterial    String? // panel | brick | monolith | monolith_brick | block | wood | other
   series          String?
-  houseCondition  String?    // good | satisfactory | poor
+  houseCondition  String? // good | satisfactory | poor
   elevators       String?
   parking         String?
   overhaulYear    Int?
@@ -198,37 +199,61 @@ model Building {
 
 /// Рыночный аналог. Каждый аналог обязан иметь источник и дату получения.
 model Comparable {
-  id              String     @id @default(cuid())
-  assessmentId    String
-  assessment      Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  position        Int        @default(0)
-  included        Boolean    @default(true)
-  sourceKind      String     @default("manual") // manual | import | provider:<code>
-  sourceName      String?    // ЦИАН, Авито, Домклик, ...
-  sourceUrl       String?
-  retrievedAt     DateTime?
-  offerDate       DateTime?
-  address         String?
-  price           Decimal    @db.Decimal(18, 2)
-  area            Decimal    @db.Decimal(12, 2)
-  rooms           Int?
-  floor           Int?
-  floors          Int?
-  wallMaterial    String?
-  yearBuilt       Int?
-  finishing       String?
-  furniture       Boolean?
-  houseCondition  String?
-  metroDistanceM  Int?
-  rights          String?    @default("Собственность")
-  description     String?
-  attributes      Json       @default("{}")
+  id               String       @id @default(cuid())
+  assessmentId     String
+  assessment       Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  position         Int          @default(0)
+  included         Boolean      @default(true)
+  sourceKind       String       @default("manual") // manual | import | provider:<code>
+  sourceName       String? // ЦИАН, Авито, Домклик, ...
+  sourceUrl        String?
+  retrievedAt      DateTime?
+  offerDate        DateTime?
+  address          String?
+  price            Decimal      @db.Decimal(18, 2)
+  area             Decimal      @db.Decimal(12, 2)
+  rooms            Int?
+  floor            Int?
+  floors           Int?
+  wallMaterial     String?
+  yearBuilt        Int?
+  finishing        String?
+  furniture        Boolean?
+  houseCondition   String?
+  metroDistanceM   Int?
+  rights           String?      @default("Собственность")
+  description      String?
+  attributes       Json         @default("{}")
   screenshotFileId String?
-  adjustments     Adjustment[]
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  /// Статус в оценке: use — используется в расчёте, review — на проверке, exclude — не используется.
+  /// included синхронизирован со статусом (included = status === "use").
+  status           String       @default("use")
+  /// Внешний источник: код поставщика и идентификатор объявления у него.
+  provider         String?
+  externalId       String?
+  houseType        String?
+  region           String?
+  city             String?
+  district         String?
+  latitude         Decimal?     @db.Decimal(9, 6)
+  longitude        Decimal?     @db.Decimal(9, 6)
+  /// Расстояние по прямой до объекта оценки, м (пересчитывается при изменении координат).
+  distanceM        Int?
+  photoUrl         String?
+  /// Дата обновления объявления у источника.
+  sourceUpdatedAt  DateTime?
+  /// Исходные данные объявления в том виде, как их вернул источник, и нормализованная копия
+  /// на момент включения в оценку. Не меняются при повторных запросах к API.
+  rawData          Json?
+  normalized       Json?
+  /// Источник каждого поля (как у объекта): { field: { source, title, at } }.
+  provenance       Json         @default("{}")
+  adjustments      Adjustment[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   @@index([assessmentId, position])
+  @@index([assessmentId, provider, externalId])
 }
 
 /// Применённая к аналогу корректировка. Хранит предложенное системой и фактическое значение.
@@ -250,7 +275,13 @@ model Adjustment {
   maxValue        Decimal?   @db.Decimal(10, 6)
   overridden      Boolean    @default(false)
   comment         String?
-  ruleSnapshot    Json?      // снимок правила справочника на момент применения
+  /// Кто и когда изменил значение вручную; характеристики объекта и аналога на тот момент.
+  overriddenById  String?
+  overriddenAt    DateTime?
+  basisSnapshot   Json?
+  /// Фактор справочника признан неприменимым к аналогу (обоснование — в comment).
+  notRequired     Boolean    @default(false)
+  ruleSnapshot    Json? // снимок правила справочника на момент применения
   updatedAt       DateTime   @updatedAt
 
   @@unique([comparableId, factorCode])
@@ -260,22 +291,22 @@ model Adjustment {
 
 /// Редакция справочника: источник → редакция → дата актуальности → лицензия.
 model AdjustmentSource {
-  id           String    @id @default(cuid())
-  code         String
-  name         String
-  publisher    String?
-  edition      String
-  actualDate   DateTime?
-  segment      String    @default("apartment")
-  licenseType  String    @default("own") // own | licensed | public | demo
-  licenseNote  String?
-  url          String?
-  isDemo       Boolean   @default(false)
-  isActive     Boolean   @default(true)
-  ownerId      String?   // null — системный справочник
-  factors      AdjustmentFactor[]
-  assessments  Assessment[]
-  createdAt    DateTime  @default(now())
+  id          String             @id @default(cuid())
+  code        String
+  name        String
+  publisher   String?
+  edition     String
+  actualDate  DateTime?
+  segment     String             @default("apartment")
+  licenseType String             @default("own") // own | licensed | public | demo
+  licenseNote String?
+  url         String?
+  isDemo      Boolean            @default(false)
+  isActive    Boolean            @default(true)
+  ownerId     String? // null — системный справочник
+  factors     AdjustmentFactor[]
+  assessments Assessment[]
+  createdAt   DateTime           @default(now())
 
   @@unique([code, edition])
 }
@@ -283,22 +314,31 @@ model AdjustmentSource {
 /// Показатель (фактор) в редакции справочника.
 /// kind: discount | category | power | manual
 model AdjustmentFactor {
-  id          String           @id @default(cuid())
+  id          String               @id @default(cuid())
   sourceId    String
-  source      AdjustmentSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  source      AdjustmentSource     @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   code        String
   name        String
   kind        String
-  attribute   String?          // извлекаемый признак: floor_category, wall_material, finishing, furniture, house_condition, metro_distance, area
-  stage       Int              @default(2)
-  sortOrder   Int              @default(0)
-  value       Decimal?         @db.Decimal(10, 6) // для discount
-  minValue    Decimal?         @db.Decimal(10, 6)
-  maxValue    Decimal?         @db.Decimal(10, 6)
-  params      Json             @default("{}")    // для power: { exponent }, для metro: { buckets }
-  reference   String?          // таблица/страница источника
+  attribute   String? // извлекаемый признак: floor_category, wall_material, finishing, furniture, house_condition, metro_distance, area
+  stage       Int                  @default(2)
+  sortOrder   Int                  @default(0)
+  value       Decimal?             @db.Decimal(10, 6) // для discount
+  minValue    Decimal?             @db.Decimal(10, 6)
+  maxValue    Decimal?             @db.Decimal(10, 6)
+  params      Json                 @default("{}") // для power: { exponent }, для metro: { buckets }
+  reference   String? // таблица/страница источника
   description String?
-  enabled     Boolean          @default(true)
+  /// Группа фактора: условия сделки, местоположение, физические характеристики…
+  groupName   String?
+  /// Регион или группа регионов, к которым относятся значения.
+  region      String?
+  /// Методика определения значения.
+  methodology String?
+  comment     String?
+  /// Дата актуальности значений фактора (если отличается от даты редакции).
+  actualDate  DateTime?
+  enabled     Boolean              @default(true)
   categories  AdjustmentCategory[]
 
   @@unique([sourceId, code])
@@ -306,15 +346,15 @@ model AdjustmentFactor {
 
 /// Категория показателя с относительным коэффициентом. Корректировка = k(объект)/k(аналог) − 1.
 model AdjustmentCategory {
-  id          String           @id @default(cuid())
-  factorId    String
-  factor      AdjustmentFactor @relation(fields: [factorId], references: [id], onDelete: Cascade)
-  code        String
-  label       String
-  coefficient Decimal          @db.Decimal(10, 6)
-  minCoefficient Decimal?      @db.Decimal(10, 6)
-  maxCoefficient Decimal?      @db.Decimal(10, 6)
-  sortOrder   Int              @default(0)
+  id             String           @id @default(cuid())
+  factorId       String
+  factor         AdjustmentFactor @relation(fields: [factorId], references: [id], onDelete: Cascade)
+  code           String
+  label          String
+  coefficient    Decimal          @db.Decimal(10, 6)
+  minCoefficient Decimal?         @db.Decimal(10, 6)
+  maxCoefficient Decimal?         @db.Decimal(10, 6)
+  sortOrder      Int              @default(0)
 
   @@unique([factorId, code])
 }
@@ -326,29 +366,29 @@ model Source {
   id           String     @id @default(cuid())
   assessmentId String
   assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  kind         String     // egrn_xml | egrn_pdf | manual | url | provider | user_import
+  kind         String // egrn_xml | egrn_pdf | manual | url | provider | user_import
   title        String
   url          String?
   retrievedAt  DateTime   @default(now())
   fileId       String?
-  extracted    Json?      // данные, извлечённые из источника (для сверки)
+  extracted    Json? // данные, извлечённые из источника (для сверки)
   note         String?
   createdAt    DateTime   @default(now())
 }
 
 model MarketData {
-  id           String     @id @default(cuid())
+  id           String      @id @default(cuid())
   assessmentId String?
   assessment   Assessment? @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   region       String?
   segment      String?
   indicator    String
-  value        Decimal    @db.Decimal(18, 4)
+  value        Decimal     @db.Decimal(18, 4)
   unit         String?
   period       String?
   sourceTitle  String
   sourceUrl    String?
-  retrievedAt  DateTime   @default(now())
+  retrievedAt  DateTime    @default(now())
 }
 
 model StoredFile {
@@ -357,7 +397,7 @@ model StoredFile {
   owner        User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   assessmentId String?
   assessment   Assessment? @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  kind         String      // photo | screenshot | egrn | signature | report | other
+  kind         String // photo | screenshot | egrn | signature | report | other
   filename     String
   mime         String
   size         Int
@@ -371,8 +411,8 @@ model StoredFile {
 
 model NormativeDocument {
   id            String    @id @default(cuid())
-  kind          String    // law | fso | sro_standard | methodology | court | literature
-  code          String?   // 135-ФЗ, ФСО I ...
+  kind          String // law | fso | sro_standard | methodology | court | literature
+  code          String? // 135-ФЗ, ФСО I ...
   title         String
   issuer        String?
   adoptedAt     DateTime?
@@ -390,28 +430,28 @@ model NormativeDocument {
 // ───────────────────────────── Расчёт и отчёт
 
 model Calculation {
-  id              String      @id @default(cuid())
-  assessmentId    String      @unique
-  assessment      Assessment  @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  settings        Json        @default("{}")
-  versions        CalculationVersion[]
-  updatedAt       DateTime    @updatedAt
+  id           String               @id @default(cuid())
+  assessmentId String               @unique
+  assessment   Assessment           @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  settings     Json                 @default("{}")
+  versions     CalculationVersion[]
+  updatedAt    DateTime             @updatedAt
 }
 
 /// Зафиксированная версия расчёта: полный снимок входа + результат + хэш.
 model CalculationVersion {
-  id             String      @id @default(cuid())
-  calculationId  String
-  calculation    Calculation @relation(fields: [calculationId], references: [id], onDelete: Cascade)
-  versionNumber  Int
-  engineVersion  String
-  inputHash      String
-  snapshot       Json
-  result         Json
-  createdById    String?
-  note           String?
-  reports        Report[]
-  createdAt      DateTime    @default(now())
+  id            String      @id @default(cuid())
+  calculationId String
+  calculation   Calculation @relation(fields: [calculationId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  engineVersion String
+  inputHash     String
+  snapshot      Json
+  result        Json
+  createdById   String?
+  note          String?
+  reports       Report[]
+  createdAt     DateTime    @default(now())
 
   @@unique([calculationId, versionNumber])
 }
@@ -439,7 +479,7 @@ model Report {
   calculationVersion   CalculationVersion @relation(fields: [calculationVersionId], references: [id])
   templateId           String
   template             ReportTemplate     @relation(fields: [templateId], references: [id])
-  format               String             // docx | pdf
+  format               String // docx | pdf
   fileId               String
   checks               Json
   createdById          String?
@@ -453,12 +493,152 @@ model AssessmentEvent {
   assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   userId       String?
   user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
-  action       String     // create | update | delete | calculate | report | import
-  entity       String     // assessment | property | building | comparable | adjustment | calculation | report | source
+  action       String // create | update | delete | calculate | report | import
+  entity       String // assessment | property | building | comparable | adjustment | calculation | report | source
   entityId     String?
   summary      String
   diff         Json?
   createdAt    DateTime   @default(now())
 
   @@index([assessmentId, createdAt])
+}
+
+/// Результат поиска объявлений у внешнего поставщика (нормализованные данные, кэш).
+model ListingSearch {
+  id           String     @id @default(cuid())
+  assessmentId String
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  provider     String
+  queryHash    String
+  query        Json
+  total        Int?
+  /// Нормализованные объявления (ограниченное количество), исходные данные — в raw каждого элемента.
+  results      Json
+  createdAt    DateTime   @default(now())
+  expiresAt    DateTime
+
+  @@index([assessmentId, createdAt])
+  @@index([provider, queryHash])
+}
+
+// ───────────── ГАР (ФИАС): только данные, нужные для поиска адресов
+
+/// Журнал потокового импорта ГАР.
+model GarImport {
+  id         String    @id @default(cuid())
+  archive    String
+  region     String?
+  stage      String
+  status     String    @default("running") // running | done | failed
+  rows       Int       @default(0)
+  error      String?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+}
+
+/// Адресообразующие элементы (AS_ADDR_OBJ): регион, муниципальное образование, населённый пункт, улица.
+model GarAddrObj {
+  objectId   BigInt @id
+  guid       String
+  name       String
+  typeName   String
+  level      Int
+  regionCode Int
+
+  @@index([regionCode, level])
+}
+
+/// Дома (AS_HOUSES).
+model GarHouse {
+  objectId   BigInt  @id
+  guid       String
+  houseNum   String?
+  addNum1    String?
+  addNum2    String?
+  houseType  Int?
+  addType1   Int?
+  addType2   Int?
+  /// Номер дома с типами из справочников ГАР (AS_HOUSE_TYPES, AS_ADDHOUSE_TYPES): «д. 12, корп. 1».
+  label      String?
+  regionCode Int
+
+  @@index([regionCode])
+}
+
+/// Муниципальная иерархия (AS_MUN_HIERARCHY): путь от региона до объекта.
+model GarHierarchy {
+  objectId    BigInt  @id
+  parentObjId BigInt?
+  path        String
+  oktmo       String?
+  regionCode  Int
+
+  @@index([regionCode])
+}
+
+/// Плоский справочник адресов домов для поиска (строится из трёх таблиц выше).
+model GarAddress {
+  objectId     BigInt  @id
+  guid         String  @unique
+  regionCode   Int
+  region       String?
+  municipality String?
+  locality     String?
+  street       String?
+  house        String?
+  fullAddress  String
+  normalized   String
+
+  @@index([regionCode])
+  @@index([municipality])
+  @@index([locality])
+  @@index([street])
+  @@index([house])
+}
+
+// ───────────── Росстат: территориальный и рыночный контекст
+
+/// Загруженный файл Росстата и результат анализа его структуры.
+model RosstatFile {
+  id         String         @id @default(cuid())
+  fileName   String
+  sha256     String         @unique
+  format     String
+  sizeBytes  BigInt
+  /// Обнаруженная структура (листы, заголовки, примеры строк) — основа для настройки импорта.
+  structure  Json
+  status     String         @default("analyzed") // analyzed | imported | failed
+  rows       Int            @default(0)
+  importedAt DateTime?
+  createdAt  DateTime       @default(now())
+  values     RosstatValue[]
+}
+
+/// Показатель Росстата.
+model RosstatSeries {
+  id       String         @id @default(cuid())
+  code     String         @unique
+  name     String
+  unit     String?
+  /// secondary_prices | price_index | incomes | housing_construction | other
+  category String
+  source   String
+  values   RosstatValue[]
+}
+
+model RosstatValue {
+  id          String        @id @default(cuid())
+  seriesId    String
+  series      RosstatSeries @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  regionCode  String?
+  regionName  String
+  period      String
+  periodStart DateTime
+  value       Decimal       @db.Decimal(20, 6)
+  fileId      String
+  file        RosstatFile   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  actualDate  DateTime?
+
+  @@unique([seriesId, regionName, period])
+  @@index([regionName, period])
 }

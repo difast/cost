@@ -48,13 +48,16 @@ export const POST = api(async (req) => {
       segment: from.segment,
       licenseType: data.licenseType,
       licenseNote: data.licenseNote,
-      isDemo: false,
+      // значения копируются как есть: копия демонстрационного справочника остаётся демонстрационной,
+      // пока оценщик явно не подтвердит значения источником
+      isDemo: from.isDemo,
       ownerId: u.id,
       factors: {
         create: from.factors.map((f) => ({
           code: f.code, name: f.name, kind: f.kind, attribute: f.attribute, stage: f.stage, sortOrder: f.sortOrder,
           value: f.value, minValue: f.minValue, maxValue: f.maxValue, params: f.params ?? {}, reference: f.reference,
           description: f.description, enabled: f.enabled,
+          groupName: f.groupName, region: f.region, methodology: f.methodology, comment: f.comment, actualDate: f.actualDate,
           categories: { create: f.categories.map((c) => ({ code: c.code, label: c.label, coefficient: c.coefficient, minCoefficient: c.minCoefficient, maxCoefficient: c.maxCoefficient, sortOrder: c.sortOrder })) },
         })),
       },

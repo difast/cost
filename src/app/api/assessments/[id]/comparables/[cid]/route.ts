@@ -19,9 +19,11 @@ export const PATCH = api(async (req, { params }: P) => {
   const { id, cid } = await params;
   const before = await load(id, cid, u.id);
   const data = await body(req, comparableSchema);
+  // статус и флаг «в расчёте» всегда согласованы
+  const status = data.status ?? (data.included === undefined ? undefined : data.included ? "use" : "exclude");
   const after = await prisma.comparable.update({
     where: { id: cid },
-    data: { ...data, price: data.price ?? undefined, area: data.area ?? undefined, position: data.position ?? undefined, included: data.included ?? undefined },
+    data: { ...data, price: data.price ?? undefined, area: data.area ?? undefined, position: data.position ?? undefined, status, included: status === undefined ? undefined : status === "use" },
   });
   await updateWithAudit({ assessmentId: id, userId: u.id, entity: "comparable", entityId: cid, before, after, summary: `Изменён аналог: ${after.address ?? cid}` });
   await syncAdjustments(id);

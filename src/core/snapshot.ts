@@ -20,6 +20,11 @@ export interface SnapshotAdjustment {
   overridden: boolean;
   comment: string | null;
   ruleSnapshot: Record<string, unknown> | null;
+  /** Только если заданы (старые снимки этих полей не содержат). */
+  notRequired?: true;
+  overriddenAt?: string;
+  overriddenById?: string;
+  basisSnapshot?: { subjectValue: string | null; comparableValue: string | null; suggestedValue: string | null };
 }
 
 export interface SnapshotComparable {
@@ -48,6 +53,18 @@ export interface SnapshotComparable {
   description: string | null;
   screenshotFileId: string | null;
   adjustments: SnapshotAdjustment[];
+  /** Поля внешнего источника и геоданные — только если заданы. */
+  status?: "review";
+  provider?: string;
+  externalId?: string;
+  houseType?: string;
+  latitude?: string;
+  longitude?: string;
+  distanceM?: number;
+  photoUrl?: string;
+  sourceUpdatedAt?: string;
+  /** Нормализованные данные объявления на момент включения в оценку. */
+  normalized?: Record<string, unknown>;
 }
 
 export interface SnapshotSource {

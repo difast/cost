@@ -5,17 +5,13 @@ import { api, errorText } from "@/lib/api";
 import { fmtNumber, fmtPercent, amountInWords } from "@/core/format";
 import { d } from "@/core/calc/decimal";
 import type { CalcSettings } from "@/core/calc/types";
+import { WEIGHT_METHODS, WEIGHT_ROUNDING_NOTE } from "@/core/calc/weights";
 import { Icon } from "@/components/ui/Icon";
 import { Badge, EmptyState, Notice, Panel, toast } from "@/components/ui/kit";
 import { NextStep, StepIssues } from "./common";
 import type { WsProps } from "./Workspace";
 
-const WEIGHT_METHODS: Array<[CalcSettings["weightMethod"], string]> = [
-  ["inverse_gross", "Обратно валовой корректировке: 1/(1+Σ|корр|)"],
-  ["linear_gross", "(S − sᵢ) / ((n − 1)·S)"],
-  ["equal", "Равные веса"],
-  ["manual", "Задать вручную"],
-];
+const METHOD_ORDER: CalcSettings["weightMethod"][] = ["inverse_gross", "linear_gross", "equal", "manual"];
 
 export function CalculationTab({ detail, calc, reload, checklist, go }: WsProps) {
   const [busy, setBusy] = useState(false);
@@ -69,8 +65,12 @@ export function CalculationTab({ detail, calc, reload, checklist, go }: WsProps)
         <div>
           <label className="label">Метод расчёта весов</label>
           <select className="input" value={s.weightMethod} disabled={busy} onChange={(e) => saveSettings({ weightMethod: e.target.value as CalcSettings["weightMethod"] })}>
-            {WEIGHT_METHODS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            {METHOD_ORDER.map((v) => <option key={v} value={v}>{WEIGHT_METHODS[v].label}</option>)}
           </select>
+          <div className="mt-1.5 rounded-md bg-canvas px-2.5 py-2 text-[12px] leading-snug text-zinc-700">
+            <div className="num font-medium text-ink">{WEIGHT_METHODS[s.weightMethod].formula}</div>
+            <div className="mt-0.5 text-muted">{WEIGHT_METHODS[s.weightMethod].explanation} {WEIGHT_ROUNDING_NOTE}</div>
+          </div>
         </div>
         {s.weightMethod === "manual" && (
           <div className="rounded-md border border-line bg-canvas p-3">

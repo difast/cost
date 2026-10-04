@@ -2,10 +2,26 @@
 // Ошибки (error) блокируют формирование отчёта, предупреждения (warning) — нет.
 
 import { d, round } from "../calc/decimal";
-import { calculate, CalcError } from "../calc/engine";
+import { calculate, CalcError, computeStats } from "../calc/engine";
+import { describeCategory, type ObjectFeatures } from "../adjustments/attributes";
 import type { CalcInput, CalcResult } from "../calc/types";
 import { fmtDate, fmtNumber, fmtPercent } from "../format";
-import type { AssessmentSnapshot } from "../snapshot";
+import type { AssessmentSnapshot, SnapshotComparable } from "../snapshot";
+
+/** Порог одной корректировки без диапазона в справочнике (доля) — выше предупреждение. */
+export const SINGLE_ADJUSTMENT_WARN = "0.3";
+/** Рост коэффициента вариации после корректировок, при котором выдаётся предупреждение (п. п.). */
+export const DISPERSION_GROWTH_PP = "0.01";
+export const DISPERSION_MESSAGE = "После корректировок разброс цен увеличился. Проверьте выбор аналогов и применённые корректировки.";
+
+const signOf = (v: string) => (d(v).isZero() ? 0 : d(v).isNeg() ? -1 : 1);
+
+function comparableFeaturesOf(c: SnapshotComparable): ObjectFeatures {
+  return {
+    area: c.area, floor: c.floor, floors: c.floors, wallMaterial: c.wallMaterial, finishing: c.finishing, furniture: c.furniture,
+    houseCondition: c.houseCondition, metroDistanceM: c.metroDistanceM, rights: c.rights, rooms: c.rooms, yearBuilt: c.yearBuilt,
+  };
+}
 
 export type Severity = "error" | "warning" | "info";
 
@@ -197,7 +213,11 @@ export function runChecks(s: AssessmentSnapshot, opts: CheckOptions = {}): Check
       issues.push({ code: "COMPARABLE_NO_ADDRESS", severity: "error", section: "comparables", message: `${c.label}: не указан адрес` });
     }
     if (!c.screenshotFileId) {
-      issues.push({ code: "COMPARABLE_NO_SCREENSHOT", severity: "warning", section: "comparables", message: `${c.label}: нет скриншота объявления для приложения` });
+      if (c.provider && c.normalized) {
+        issues.push({ code: "COMPARABLE_NO_SCREENSHOT", severity: "info", section: "comparables", message: `${c.label}: скриншот не приложен — в отчёт попадут данные объявления из ${c.provider === "metrapi" ? "Metrapi" : c.provider} на дату получения` });
+      } else {
+        issues.push({ code: "COMPARABLE_NO_SCREENSHOT", severity: "warning", section: "comparables", message: `${c.label}: нет скриншота объявления для приложения` });
+      }
     }
     const offer = c.offerDate ?? c.retrievedAt;
     if (offer && a.valuationDate) {
@@ -220,10 +240,52 @@ export function runChecks(s: AssessmentSnapshot, opts: CheckOptions = {}): Check
     }
   }
 
+  for (const c of s.comparables.filter((x) => x.status === "review")) {
+    issues.push({ code: "COMPARABLE_IN_REVIEW", severity: "info", section: "comparables", message: `${c.label}: на проверке — в расчёте не участвует` });
+  }
+
   // 7. Корректировки
+  const subjectF: ObjectFeatures = {
+    area: p.area, floor: p.floor, floors: s.building.floors, wallMaterial: s.building.wallMaterial, finishing: p.finishing, furniture: p.furniture,
+    houseCondition: s.building.houseCondition, metroDistanceM: p.metroDistanceM, rights: p.rights, rooms: p.rooms, yearBuilt: s.building.yearBuilt,
+  };
   for (const c of included) {
+    const compF = comparableFeaturesOf(c);
     for (const adj of c.adjustments) {
       const name = `${c.label} / ${adj.factorName}`;
+      const rsFactor = (adj.ruleSnapshot as { factor?: { kind?: string; attribute?: string | null } } | null)?.factor;
+      if (adj.notRequired) {
+        if (!adj.comment?.trim()) {
+          issues.push({ code: "ADJ_NOT_REQUIRED_NO_REASON", severity: "error", section: "adjustments", field: `adjustment.${adj.id}`, message: `${name}: фактор отмечен «Не требуется» без обоснования` });
+        }
+        if (!d(adj.value).isZero()) {
+          issues.push({ code: "ADJ_NOT_REQUIRED_VALUE", severity: "error", section: "adjustments", field: `adjustment.${adj.id}`, message: `${name}: фактор отмечен «Не требуется», но применено ${fmtPercent(adj.value)}` });
+        }
+        continue;
+      }
+      // Знак: аналог хуже объекта (по справочнику корректировка > 0) — применённая не может быть отрицательной, и наоборот
+      if (adj.suggestedValue !== null && signOf(adj.suggestedValue) !== 0 && signOf(adj.value) !== 0 && signOf(adj.value) !== signOf(adj.suggestedValue)) {
+        const worse = signOf(adj.suggestedValue) > 0;
+        issues.push({ code: "ADJ_SIGN", severity: "error", section: "adjustments", field: `adjustment.${adj.id}`, message: `${name}: аналог ${worse ? "хуже" : "лучше"} объекта (по справочнику ${fmtPercent(adj.suggestedValue, 2, true)}), а применена ${worse ? "отрицательная" : "положительная"} корректировка ${fmtPercent(adj.value, 2, true)}` });
+      }
+      // Характеристики изменились после ручного изменения значения
+      if (adj.overridden && adj.basisSnapshot && (adj.basisSnapshot.subjectValue !== adj.subjectValue || adj.basisSnapshot.comparableValue !== adj.comparableValue)) {
+        issues.push({ code: "ADJ_BASIS_CHANGED", severity: "error", section: "adjustments", field: `adjustment.${adj.id}`, message: `${name}: после ручной корректировки изменились характеристики (было: ${adj.basisSnapshot.subjectValue ?? "—"} / ${adj.basisSnapshot.comparableValue ?? "—"}, стало: ${adj.subjectValue ?? "—"} / ${adj.comparableValue ?? "—"}) — пересмотрите значение` });
+      }
+      // Значение характеристики в расчёте совпадает с карточкой объекта и аналога
+      if (rsFactor?.attribute && ["category", "power", "formula"].includes(rsFactor.kind ?? "")) {
+        const expC = describeCategory(rsFactor.attribute, compF);
+        const expS = describeCategory(rsFactor.attribute, subjectF);
+        if (expC !== "—" && adj.comparableValue && !adj.comparableValue.startsWith(expC)) {
+          issues.push({ code: "ADJ_VALUE_MISMATCH", severity: "error", section: "adjustments", message: `${name}: в расчёте у аналога «${adj.comparableValue}», а в карточке аналога — «${expC}». Обновите корректировки` });
+        }
+        if (expS !== "—" && adj.subjectValue && !adj.subjectValue.startsWith(expS)) {
+          issues.push({ code: "ADJ_VALUE_MISMATCH", severity: "error", section: "adjustments", message: `${name}: в расчёте у объекта «${adj.subjectValue}», а в карточке объекта — «${expS}». Обновите корректировки` });
+        }
+      }
+      if (adj.minValue === null && adj.maxValue === null && d(adj.value).abs().gt(SINGLE_ADJUSTMENT_WARN)) {
+        issues.push({ code: "ADJ_LARGE", severity: "warning", section: "adjustments", message: `${name}: корректировка ${fmtPercent(adj.value, 2, true)} превышает ${fmtPercent(SINGLE_ADJUSTMENT_WARN, 0)} по модулю — проверьте сопоставимость аналога` });
+      }
       if (adj.overridden && !adj.comment?.trim()) {
         issues.push({ code: "ADJ_NO_COMMENT", severity: "error", section: "adjustments", field: `adjustment.${adj.id}`, message: `${name}: значение изменено вручную без обоснования` });
       }
@@ -231,8 +293,8 @@ export function runChecks(s: AssessmentSnapshot, opts: CheckOptions = {}): Check
         // неопределённая корректировка, введённая без обоснования
         issues.push({ code: "ADJ_NO_BASIS", severity: "warning", section: "adjustments", message: `${name}: значение не подтверждено справочником` });
       }
-      if (adj.suggestedValue === null && !adj.overridden && d(adj.value).isZero() && adj.ruleSnapshot && (adj.ruleSnapshot as { factor?: { kind?: string } }).factor?.kind === "category") {
-        issues.push({ code: "ADJ_NOT_DETERMINED", severity: "warning", section: "adjustments", message: `${name}: не хватает данных для расчёта корректировки (принят 0)` });
+      if (adj.suggestedValue === null && !adj.overridden && d(adj.value).isZero() && ["category", "power", "formula"].includes(rsFactor?.kind ?? "")) {
+        issues.push({ code: "ADJ_NOT_DETERMINED", severity: "warning", section: "adjustments", field: `adjustment.${adj.id}`, message: `${name}: не хватает данных для расчёта корректировки (принят 0). Укажите значение с обоснованием или отметьте «Не требуется»` });
       }
       const v = d(adj.value);
       if ((adj.minValue !== null && v.lt(adj.minValue)) || (adj.maxValue !== null && v.gt(adj.maxValue))) {
@@ -336,6 +398,13 @@ export function runChecks(s: AssessmentSnapshot, opts: CheckOptions = {}): Check
     }
     if (p.area && !d(result.subjectArea).eq(round(p.area, 2))) {
       issues.push({ code: "AREA_CALC_MISMATCH", severity: "error", section: "calculation", message: "Площадь в расчёте не совпадает с площадью объекта" });
+    }
+    // Разброс исходных и скорректированных цен
+    if (result.comparables.length >= 2) {
+      const rawStats = computeStats(result.comparables.map((c) => d(c.unitPrice)));
+      if (d(result.stats.cv).minus(rawStats.cv).gte(DISPERSION_GROWTH_PP)) {
+        issues.push({ code: "DISPERSION_GROWTH", severity: "warning", section: "calculation", message: `${DISPERSION_MESSAGE} Коэффициент вариации: до ${fmtPercent(rawStats.cv)}, после ${fmtPercent(result.stats.cv)}` });
+      }
     }
     for (const w of result.warnings) {
       issues.push({ code: "CALC_WARNING", severity: "warning", section: "calculation", message: w });

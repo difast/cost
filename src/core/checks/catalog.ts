@@ -34,14 +34,17 @@ export const CHECK_CATALOG: CatalogItem[] = [
   { id: "comparables_sources", step: "comparables", title: "У аналогов есть источник, дата и адрес", hint: "Каждая цифра расчёта должна иметь источник", codes: ["COMPARABLE_NO_SOURCE", "COMPARABLE_NO_DATE", "COMPARABLE_NO_ADDRESS"] },
   { id: "comparables_screens", step: "comparables", title: "Скриншоты объявлений приложены", hint: "Скриншоты попадают в приложение к отчёту", codes: ["COMPARABLE_NO_SCREENSHOT"] },
   { id: "comparables_dates", step: "comparables", title: "Предложения актуальны на дату оценки", hint: "Дата предложения не позже даты оценки и не старше шести месяцев", codes: ["COMPARABLE_AFTER_VALUATION", "COMPARABLE_STALE"] },
-  { id: "comparables_quality", step: "comparables", title: "Аналоги корректны и не дублируются", hint: "Этаж не больше этажности, нет повторов и самого объекта оценки", codes: ["COMPARABLE_FLOOR", "COMPARABLE_DUPLICATE", "COMPARABLE_IS_SUBJECT"] },
-  { id: "adj_justified", step: "adjustments", title: "Ручные корректировки обоснованы", hint: "Изменение значения справочника требует обоснования", codes: ["ADJ_NO_COMMENT", "ADJ_NO_BASIS"] },
-  { id: "adj_range", step: "adjustments", title: "Корректировки в пределах справочника", hint: "Значения не выходят за диапазон и рассчитаны по данным", codes: ["ADJ_OUT_OF_RANGE", "ADJ_NOT_DETERMINED"] },
+  { id: "comparables_quality", step: "comparables", title: "Аналоги корректны и не дублируются", hint: "Этаж не больше этажности, нет повторов и самого объекта оценки", codes: ["COMPARABLE_FLOOR", "COMPARABLE_DUPLICATE", "COMPARABLE_IS_SUBJECT", "COMPARABLE_IN_REVIEW"] },
+  { id: "adj_justified", step: "adjustments", title: "Ручные корректировки обоснованы", hint: "Изменение значения справочника требует обоснования", codes: ["ADJ_NO_COMMENT", "ADJ_NO_BASIS", "ADJ_NOT_REQUIRED_NO_REASON", "ADJ_NOT_REQUIRED_VALUE"] },
+  { id: "adj_sign", step: "adjustments", title: "Знак корректировок соответствует сравнению", hint: "Аналог хуже объекта — корректировка положительная, лучше — отрицательная", codes: ["ADJ_SIGN"] },
+  { id: "adj_data", step: "adjustments", title: "Корректировки рассчитаны по актуальным характеристикам", hint: "Значения в расчёте совпадают с карточками объекта и аналога; после ручной правки характеристики не менялись", codes: ["ADJ_VALUE_MISMATCH", "ADJ_BASIS_CHANGED"] },
+  { id: "adj_range", step: "adjustments", title: "Корректировки в пределах справочника", hint: "Значения не выходят за диапазон и рассчитаны по данным", codes: ["ADJ_OUT_OF_RANGE", "ADJ_NOT_DETERMINED", "ADJ_LARGE"] },
   { id: "directory", step: "adjustments", title: "Справочник корректировок подтверждён", hint: "Используется одна редакция; демонстрационный справочник требует проверки", codes: ["ADJ_EDITION_MIXED", "DIRECTORY_DEMO"] },
   { id: "calc_chain", step: "calculation", title: "Цепочка корректировок сходится", hint: "Каждый шаг: цена до + изменение = цена после", codes: ["CALC_ERROR", "CHAIN_MISMATCH", "CHAIN_TOTAL", "STORED_RESULT_MISMATCH"], needsResult: true },
   { id: "weights", step: "calculation", title: "Веса аналогов сходятся", hint: "Сумма весов равна 1, сумма вкладов равна средневзвешенной цене", codes: ["WEIGHTS_SUM", "WEIGHTED_MISMATCH"], needsResult: true },
   { id: "total", step: "calculation", title: "Итог = цена за м² × площадь", hint: "Итоговая стоимость согласована с ценой за м² и площадью", codes: ["TOTAL_MISMATCH", "RAW_MISMATCH"], needsResult: true },
   { id: "sample", step: "calculation", title: "Выборка однородна", hint: "Коэффициент вариации и суммарные корректировки в допустимых пределах", codes: ["CALC_WARNING"], needsResult: true },
+  { id: "dispersion", step: "calculation", title: "Корректировки не увеличивают разброс цен", hint: "Коэффициент вариации скорректированных цен не выше, чем у исходных", codes: ["DISPERSION_GROWTH"], needsResult: true },
 ];
 
 export interface ChecklistItem extends CatalogItem {

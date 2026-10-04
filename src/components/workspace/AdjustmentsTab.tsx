@@ -18,10 +18,11 @@ type RuleSnap = { explanation?: string; sourceName?: string; edition?: string; f
 /** Состояние корректировки для оценщика. */
 function adjState(a: AdjustmentRow): { label: string; tone: Tone; hint: string } {
   const kind = (a.ruleSnapshot as RuleSnap)?.factor?.kind;
+  if (a.notRequired) return { label: "Не требуется", tone: "neutral", hint: a.comment ? `Обоснование: ${a.comment}` : "Укажите обоснование" };
   if (a.overridden && !a.comment?.trim()) return { label: "Требует обоснования", tone: "err", hint: "Значение изменено вручную — укажите обоснование" };
   if (a.overridden) return { label: "Ручная", tone: "info", hint: "Значение задано оценщиком с обоснованием" };
   if (a.suggestedValue === null) return { label: "Нет данных", tone: "warn", hint: "Не хватает характеристик объекта или аналога — принят 0 %" };
-  if (kind === "power") return { label: "Автоматическая", tone: "brand", hint: "Рассчитана по формуле справочника" };
+  if (kind === "power" || kind === "formula") return { label: "Автоматическая", tone: "brand", hint: "Рассчитана по формуле справочника" };
   if (kind === "manual") return { label: "Экспертная", tone: "neutral", hint: "Определяется оценщиком; по умолчанию 0 %" };
   return { label: "Из справочника", tone: "brand", hint: "Значение из выбранной редакции справочника" };
 }
