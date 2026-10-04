@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { Toaster } from "@/components/ui/kit";
+import { BrandMark } from "@/components/BrandMark";
 
 const SECONDARY: Array<{ href: string; label: string; icon: IconName }> = [
   { href: "/app/directory", label: "Справочник корректировок", icon: "sliders" },
@@ -17,10 +18,7 @@ const SECONDARY: Array<{ href: string; label: string; icon: IconName }> = [
 function Logo() {
   return (
     <Link href="/app" className="flex items-center gap-2 px-2 text-[15px] font-semibold tracking-tight text-white">
-      <svg width="22" height="22" viewBox="0 0 512 512" aria-hidden="true">
-        <rect width="512" height="512" rx="96" fill="#176b4d" />
-        <path d="M128 300 256 168l128 132v108H292v-80h-72v80h-92z" fill="#fff" />
-      </svg>
+      <BrandMark size={24} />
       ЭВМО
     </Link>
   );

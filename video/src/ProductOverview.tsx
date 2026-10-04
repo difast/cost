@@ -27,8 +27,12 @@ export const TOTAL_FRAMES = INTRO + SCENES.length * SCENE + OUTRO;
 
 const Logo = ({ size = 56 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 512 512">
-    <rect width="512" height="512" rx="96" fill="#fff" />
-    <path d="M128 300 256 168l128 132v108H292v-80h-72v80h-92z" fill={BRAND} />
+    <rect width="512" height="512" rx="112" fill="#fff" />
+    <g fill="none" stroke={BRAND} strokeWidth={44} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M124 176 256 92l132 84" />
+      <path d="M191.8 250.7A96 96 0 1 1 191.8 393.3" />
+      <path d="M220 322H352" />
+    </g>
   </svg>
 );
 

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { BrandMark } from "@/components/BrandMark";
 
 const NAV = [
   ["#features", "Возможности"],
@@ -14,10 +15,7 @@ const NAV = [
 export function Logo({ className = "" }: { className?: string }) {
   return (
     <Link href="/" className={`flex items-center gap-2 font-semibold tracking-tight ${className}`} aria-label="ЭВМО — на главную">
-      <svg width="26" height="26" viewBox="0 0 512 512" aria-hidden="true">
-        <rect width="512" height="512" rx="96" fill="#1e6b50" />
-        <path d="M128 300 256 168l128 132v108H292v-80h-72v80h-92z" fill="#fff" />
-      </svg>
+      <BrandMark size={28} />
       <span className="text-[17px]">ЭВМО</span>
     </Link>
   );

@@ -9,7 +9,10 @@ export const metadata: Metadata = {
   description: "ЭВМО — рабочая система для оценки недвижимости: от адреса до готового отчёта.",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "ЭВМО", statusBarStyle: "default" },
-  icons: { icon: [{ url: "/icons/icon.svg", type: "image/svg+xml" }, { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }], apple: "/icons/apple-touch-icon.png" },
+  icons: {
+    icon: [{ url: "/favicon.ico", sizes: "16x16 32x32 48x48" }, { url: "/icons/icon.svg", type: "image/svg+xml" }, { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = { themeColor: "#1e6b50", width: "device-width", initialScale: 1 };
