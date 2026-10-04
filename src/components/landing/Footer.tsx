@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Logo } from "./Header";
+import { COMPANY } from "@/lib/company";
 
-export function Footer({ contactEmail }: { contactEmail?: string }) {
+export function Footer() {
   const year = new Date().getFullYear();
   return (
     <footer className="border-t border-slate-200 bg-white">
@@ -31,19 +32,16 @@ export function Footer({ contactEmail }: { contactEmail?: string }) {
         <div id="contacts">
           <div className="text-[12px] font-semibold uppercase tracking-wide text-slate-400">Контакты</div>
           <ul className="mt-3 space-y-2 text-[13.5px] text-slate-600">
-            {contactEmail ? (
-              <li><a href={`mailto:${contactEmail}`} className="hover:text-slate-900">{contactEmail}</a></li>
-            ) : (
-              <li className="text-slate-400">Контакты появятся в ближайшее время</li>
-            )}
+            {COMPANY.email && <li><a href={`mailto:${COMPANY.email}`} className="hover:text-slate-900">{COMPANY.email}</a></li>}
+            <li className="text-slate-500">Время связи: {COMPANY.hours}</li>
             <li><Link href="/login" className="hover:text-slate-900">Вход для оценщиков</Link></li>
           </ul>
         </div>
       </div>
       <div className="border-t border-slate-200">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 px-5 py-5 text-[12px] text-slate-400 sm:flex-row sm:justify-between">
-          <span>© {year} Оценка.Про</span>
-          <span>Сервис не заменяет профессиональное суждение и ответственность оценщика.</span>
+          <span>© {year} Оценка.Про · {COMPANY.name}, ОГРН {COMPANY.ogrn}, ИНН {COMPANY.inn}, {COMPANY.address}</span>
+          <span className="sm:text-right">Сервис не заменяет профессиональное суждение и ответственность оценщика.</span>
         </div>
       </div>
     </footer>

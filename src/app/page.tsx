@@ -4,7 +4,8 @@ import { Header } from "@/components/landing/Header";
 import { Footer } from "@/components/landing/Footer";
 import { Checks, Example, Faq, Features, FinalCta, Hero, HowItWorks, Normative, Pricing, Problem } from "@/components/landing/Sections";
 import { PLANS } from "@/lib/plans";
-import { CONTACT_EMAIL, SITE_NAME, SITE_URL } from "@/lib/site";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
+import { COMPANY } from "@/lib/company";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,7 @@ function JsonLd() {
       operatingSystem: "Web",
       inLanguage: "ru",
       description: DESCRIPTION,
+      publisher: { "@type": "Organization", name: COMPANY.name },
       offers: PLANS.map((p) => ({
         "@type": "Offer",
         name: p.name,
@@ -47,7 +49,16 @@ function JsonLd() {
         description: p.audience,
       })),
     },
-    { "@context": "https://schema.org", "@type": "Organization", name: SITE_NAME, url: SITE_URL, logo: `${SITE_URL}/icons/icon-512.png` },
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: SITE_NAME,
+      legalName: COMPANY.name,
+      url: SITE_URL,
+      logo: `${SITE_URL}/icons/icon-512.png`,
+      taxID: COMPANY.inn,
+      address: { "@type": "PostalAddress", streetAddress: "ул. Маршала Катукова, д. 22 к. 1", addressLocality: "Москва", postalCode: "123592", addressCountry: "RU" },
+    },
   ];
   return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />;
 }
@@ -71,7 +82,7 @@ export default async function Home() {
         <Faq />
         <FinalCta authed={authed} />
       </main>
-      <Footer contactEmail={CONTACT_EMAIL} />
+      <Footer />
     </div>
   );
 }
