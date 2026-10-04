@@ -14,26 +14,26 @@
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
-    "bcryptjs": "^3.0.3",
-    "decimal.js": "^10.6.0",
-    "docx": "^9.8.1",
-    "next": "^15.5.27",
-    "pdfmake": "^0.3.11",
-    "prisma": "^6.19.3",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
-    "zod": "^4.6.5"
-  },
-  "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^26.6.4",
     "@types/pdfmake": "^0.3.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "bcryptjs": "^3.0.3",
+    "decimal.js": "^10.6.0",
+    "docx": "^9.8.1",
+    "next": "^15.5.27",
+    "pdfmake": "^0.3.11",
     "postcss": "^8.5.28",
+    "prisma": "^6.19.3",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
     "vitest": "^5.0.3"
   }
 }
