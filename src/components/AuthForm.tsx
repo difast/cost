@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, errorText } from "@/lib/api";
 import { BrandMark } from "@/components/BrandMark";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { PLANS, TRIAL_DAYS, isPlanCode, type PlanCode } from "@/core/billing";
 
 const TRIAL_PLANS: PlanCode[] = ["basic", "pro", "team"];
@@ -80,7 +81,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         </div>
         <div>
           <label className="label">Пароль{mode === "register" && " (не менее 8 символов)"}</label>
-          <input className="input" type="password" required minLength={mode === "register" ? 8 : 1} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} />
+          <PasswordInput className="input" required minLength={mode === "register" ? 8 : 1} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} />
         </div>
         {error && <div className="rounded-md border border-err/25 bg-err-soft px-3 py-2 text-[13px] text-err" role="alert">{error}</div>}
         <button className="btn btn-primary btn-lg w-full" disabled={busy}>{busy ? "Подождите…" : mode === "login" ? "Войти" : "Зарегистрироваться"}</button>
